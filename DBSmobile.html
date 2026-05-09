@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DVD Pro Striker: Mobile Frenzy</title>
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-gold: #ffcc00;
+            --bg-color: #050505;
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background: var(--bg-color);
+            font-family: 'Segoe UI', sans-serif;
+            touch-action: none; user-select: none; -webkit-user-select: none;
+        }
+
+        canvas { display: block; }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; color: white; text-align: center;
+            background: rgba(0, 0, 0, 0.85); z-index: 100;
+        }
+
+        .btn {
+            background: transparent; border: 2px solid var(--neon-blue);
+            color: var(--neon-blue); padding: 15px 40px; font-size: 1.5rem;
+            cursor: pointer; text-transform: uppercase; margin-top: 20px;
+            box-shadow: 0 0 15px var(--neon-blue); transition: 0.3s;
+        }
+
+        .btn:active { background: var(--neon-blue); color: black; }
+
+        #hud {
+            position: absolute; top: 10px; width: 100%; display: flex;
+            justify-content: space-around; color: var(--neon-blue);
+            font-weight: bold; font-size: 1.2rem; pointer-events: none;
+            text-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        #ranking-list { list-style: none; padding: 0; color: var(--neon-gold); }
+        
+        .chaos-alert {
+            position: absolute; top: 40%; width: 100%; text-align: center;
+            font-size: 3rem; color: var(--neon-pink); font-weight: 900;
+            display: none; text-shadow: 0 0 20px var(--neon-pink);
+            pointer-events: none; animation: flash 0.5s infinite;
+        }
+
+        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <div id="score-display">SCORE: 0</div>
+        <div id="timer-display">TIME: 60</div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1 style="color:var(--neon-pink); font-size: 2.5rem; margin-bottom: 5px;">DVD PRO STRIKER</h1>
+        <p style="color:var(--neon-blue); font-size: 1rem; margin-bottom: 20px;">MOBILE FRENZY</p>
+        <div style="text-align: left; font-size: 0.9rem; line-height: 1.6; border: 1px solid #444; padding: 15px; border-radius: 10px;">
+            ・初期ブロック：<span style="color:var(--neon-gold)">3個</span><br>
+            ・中央エリア：指で「シールド」操作<br>
+            ・外周エリア：タップで「衝撃波」（3秒毎）<br>
+            ・タッチ中：<span style="color:var(--neon-pink)">超加速</span> / 離すと：<span style="color:var(--neon-blue)">減速</span>
+        </div>
+        <button class="btn" onclick="startGame()">START MISSION</button>
+    </div>
+
+    <div id="result-screen" class="overlay" style="display:none;">
+        <h2 style="color:var(--neon-gold)">MISSION COMPLETE</h2>
+        <div id="final-score" style="font-size: 2rem;">0</div>
+        <div style="margin-top: 20px;">
+            <h3>TOP 5 RANKING</h3>
+            <ul id="ranking-list"></ul>
+        </div>
+        <button class="btn" onclick="location.reload()">RETRY</button>
+    </div>
+
+    <div id="chaos-ui" class="chaos-alert">CHAOS MODE: NO PENALTY!</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score-display');
+const timerEl = document.getElementById('timer-display');
+const chaosUi = document.getElementById('chaos-ui');
+
+const GAME_TIME = 60;
+const CORNER_PTS = 10000;
+const WALL_PTS = 100;
+const COLLISION_PENALTY = -100;
+const SHOCKWAVE_CD = 3000;
+
+let score = 0;
+let timeLeft = GAME_TIME;
+let gameActive = false;
+let isTouching = false;
+let lastShockwave = 0;
+let chaosMode = false;
+
+let touchPos = { x: -1000, y: -1000 };
+let shockwavePos = { x: -1000, y: -1000, radius: 0 };
+let particles = [];
+let blocks = [];
+
+class DVDBlock {
+    constructor() {
+        this.w = canvas.width * 0.12;
+        this.h = this.w * 0.6;
+        this.resetPosition();
+        this.color = `hsl(${Math.random() * 360}, 100%, 70%)`;
+        this.history = [];
+        this.lastMoveTime = Date.now();
+    }
+
+    resetPosition() {
+        this.x = Math.random() * (canvas.width - this.w);
+        this.y = Math.random() * (canvas.height - this.h);
+        this.vx = (Math.random() > 0.5 ? 1 : -1) * 3;
+        this.vy = (Math.random() > 0.5 ? 1 : -1) * 3;
+    }
+
+    update() {
+        const speedMultiplier = isTouching ? 2.5 : 0.6;
+        let curVx = this.vx * speedMultiplier;
+        let curVy = this.vy * speedMultiplier;
+
+        const oldX = this.x;
+        const oldY = this.y;
+        this.x += curVx;
+        this.y += curVy;
+
+        let hitWall = false;
+        if (this.x <= 0 || this.x + this.w >= canvas.width) {
+            this.vx *= -1;
+            this.x = this.x <= 0 ? 0 : canvas.width - this.w;
+            hitWall = true;
+        }
+        if (this.y <= 0 || this.y + this.h >= canvas.height) {
+            this.vy *= -1;
+            this.y = this.y <= 0 ? 0 : canvas.height - this.h;
+            hitWall = true;
+        }
+
+        if (hitWall) {
+            const atX = (this.x <= 0 || this.x + this.w >= canvas.width);
+            const atY = (this.y <= 0 || this.y + this.h >= canvas.height);
+            if (atX && atY) {
+                score += CORNER_PTS;
+                createExplosion(this.x + this.w / 2, this.y + this.h / 2, true);
+                vibrate(100);
+                flashScreen();
+            } else {
+                score += WALL_PTS;
+                vibrate(10);
+            }
+        }
+
+        this.history.unshift({x: this.x, y: this.y});
+        if (this.history.length > 8) this.history.pop();
+
+        if (Math.abs(oldX - this.x) > 0.1 || Math.abs(oldY - this.y) > 0.1) {
+            this.lastMoveTime = Date.now();
+        } else if (Date.now() - this.lastMoveTime > 3000) {
+            this.resetPosition();
+        }
+
+        this.checkInteractions();
+    }
+
+    checkInteractions() {
+        const dx = (this.x + this.w / 2) - touchPos.x;
+        const dy = (this.y + this.h / 2) - touchPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 80) {
+            const angle = Math.atan2(dy, dx);
+            this.vx = Math.cos(angle) * 5;
+            this.vy = Math.sin(angle) * 5;
+        }
+
+        if (shockwavePos.radius > 0) {
+            const sdx = (this.x + this.w / 2) - shockwavePos.x;
+            const sdy = (this.y + this.h / 2) - shockwavePos.y;
+            const sdist = Math.sqrt(sdx * sdx + sdy * sdy);
+            if (sdist < shockwavePos.radius + 50) {
+                const angle = Math.atan2(sdy, sdx);
+                this.vx = Math.cos(angle) * 15;
+                this.vy = Math.sin(angle) * 15;
+            }
+        }
+    }
+
+    draw() {
+        this.history.forEach((pos, i) => {
+            ctx.globalAlpha = 0.3 - (i * 0.03);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(pos.x, pos.y, this.w, this.h);
+        });
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "black";
+        ctx.font = `bold ${this.w * 0.25}px Arial`;
+        ctx.textAlign = "center";
+        ctx.shadowBlur = 0;
+        ctx.fillText("DVD", this.x + this.w / 2, this.y + this.h * 0.65);
+    }
+}
+
+function init() {
+    resize();
+    // 最初のブロック個数を3個に設定
+    blocks = [];
+    for(let i=0; i<3; i++) {
+        blocks.push(new DVDBlock());
+    }
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('touchmove', handleTouch, { passive: false });
+    canvas.addEventListener('touchend', () => { isTouching = false; touchPos = {x:-1000, y:-1000}; });
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    blocks.forEach(b => { b.w = canvas.width * 0.12; b.h = b.w * 0.6; });
+}
+
+function handleTouch(e) {
+    e.preventDefault();
+    isTouching = true;
+    const t = e.touches[0];
+    const x = t.clientX;
+    const y = t.clientY;
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const rx = canvas.width * 0.35;
+    const ry = canvas.height * 0.35;
+    const isInEllipse = (Math.pow(x - centerX, 2) / Math.pow(rx, 2)) + (Math.pow(y - centerY, 2) / Math.pow(ry, 2)) <= 1;
+
+    if (isInEllipse) {
+        touchPos = { x, y };
+    } else {
+        const now = Date.now();
+        if (now - lastShockwave > SHOCKWAVE_CD) {
+            triggerShockwave(x, y);
+            lastShockwave = now;
+        }
+    }
+}
+
+function triggerShockwave(x, y) {
+    shockwavePos = { x, y, radius: 10 };
+    vibrate(50);
+    const interval = setInterval(() => {
+        shockwavePos.radius += 15;
+        if (shockwavePos.radius > 150) {
+            shockwavePos.radius = 0;
+            clearInterval(interval);
+        }
+    }, 16);
+}
+
+function checkBlockCollisions() {
+    if (chaosMode) return;
+    for (let i = 0; i < blocks.length; i++) {
+        for (let j = i + 1; j < blocks.length; j++) {
+            const b1 = blocks[i];
+            const b2 = blocks[j];
+            if (b1.x < b2.x + b2.w && b1.x + b1.w > b2.x && b1.y < b2.y + b2.h && b1.y + b1.h > b2.y) {
+                score += COLLISION_PENALTY;
+                b1.vx *= -1; b1.vy *= -1;
+                b2.vx *= -1; b2.vy *= -1;
+            }
+        }
+    }
+}
+
+function startGame() {
+    document.getElementById('start-screen').style.display = 'none';
+    gameActive = true;
+    const timerInt = setInterval(() => {
+        if (!gameActive) { clearInterval(timerInt); return; }
+        timeLeft--;
+        timerEl.innerText = `TIME: ${timeLeft}`;
+        if (timeLeft <= 10) {
+            chaosMode = true;
+            chaosUi.style.display = 'block';
+            if (timeLeft % 2 === 0) { for(let i=0; i<3; i++) blocks.push(new DVDBlock()); }
+        }
+        if (timeLeft <= 0) { endGame(); clearInterval(timerInt); }
+    }, 1000);
+    requestAnimationFrame(update);
+}
+
+function endGame() {
+    gameActive = false;
+    document.getElementById('result-screen').style.display = 'flex';
+    document.getElementById('final-score').innerText = score.toLocaleString() + " pt";
+    let scores = JSON.parse(localStorage.getItem('dvd_scores') || '[]');
+    scores.push(score);
+    scores.sort((a, b) => b - a);
+    scores = scores.slice(0, 5);
+    localStorage.setItem('dvd_scores', JSON.stringify(scores));
+    document.getElementById('ranking-list').innerHTML = scores.map((s, i) => `<li>${i+1}位: ${s.toLocaleString()} pt</li>`).join('');
+}
+
+function createExplosion(x, y, isGold) {
+    for (let i = 0; i < 30; i++) {
+        particles.push({
+            x, y,
+            vx: (Math.random() - 0.5) * 15,
+            vy: (Math.random() - 0.5) * 15,
+            life: 1.0,
+            color: isGold ? '#ffcc00' : '#00f3ff'
+        });
+    }
+}
+
+function flashScreen() {
+    ctx.fillStyle = 'white';
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+}
+
+function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+function update() {
+    if (!gameActive) return;
+    ctx.fillStyle = 'rgba(5, 5, 5, 0.4)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    checkBlockCollisions();
+    blocks.forEach(b => { b.update(); b.draw(); });
+
+    particles = particles.filter(p => {
+        p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+        ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 4, 4);
+        return p.life > 0;
+    });
+    ctx.globalAlpha = 1;
+
+    if (isTouching) {
+        ctx.beginPath(); ctx.arc(touchPos.x, touchPos.y, 80, 0, Math.PI * 2);
+        ctx.strokeStyle = '#00f3ff'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    const cdRatio = Math.min(1, (Date.now() - lastShockwave) / SHOCKWAVE_CD);
+    ctx.beginPath(); ctx.arc(50, canvas.height - 50, 30, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * cdRatio));
+    ctx.strokeStyle = cdRatio === 1 ? '#ffcc00' : '#00f3ff'; ctx.lineWidth = 5; ctx.stroke();
+
+    scoreEl.innerText = `SCORE: ${score.toLocaleString()}`;
+    requestAnimationFrame(update);
+}
+
+init();
+</script>
+</body>
+</html>
