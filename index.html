@@ -3,71 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DVD Pro Striker: Mobile Frenzy 150%</title>
+    <title>DVD Pro Striker: Ultimate Chaos Fix</title>
     <style>
-        :root { --neon: #00f2ff; --warn: #ff3e3e; --gold: #ffd700; --frenzy: #ff0055; }
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; 
-            background: #000; font-family: 'Arial Black', sans-serif; color: white;
-            touch-action: none; user-select: none; -webkit-user-select: none;
+        :root {
+            --neon: #00f2ff;
+            --warn: #ff3e3e;
+            --gold: #ffd700;
+            --bg: #0a0a0a;
+            --text: #ffffff;
+            --grid: rgba(0, 242, 255, 0.12);
+            --panel: rgba(255, 255, 255, 0.08);
         }
-        canvas { display: block; }
 
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        .hud { position: absolute; padding: 15px; }
-        #score-display { top: 0; right: 10px; text-align: right; font-size: 24px; color: var(--neon); text-shadow: 0 0 10px var(--neon); }
-        #timer-display { top: 10px; left: 50%; transform: translateX(-50%); font-size: 40px; color: #fff; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background: var(--bg); font-family: 'Courier New', Courier, monospace; color: var(--text);
+            touch-action: none; user-select: none;
+        }
+
+        canvas { display: block; cursor: none; }
+
+        #ui-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center;
+        }
         
+        .hud-center {
+            margin-top: 15px; text-align: center; background: var(--panel);
+            padding: 10px 30px; border: 1px solid var(--grid); border-top: none;
+            border-radius: 0 0 20px 20px; backdrop-filter: blur(5px);
+        }
+        #score-display { font-size: 32px; color: var(--neon); letter-spacing: 2px; font-weight: bold; }
+        #best-display { font-size: 11px; opacity: 0.6; }
+        #timer-display { font-size: 40px; font-weight: bold; margin-top: 5px; }
+
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 100; pointer-events: auto; text-align: center;
+            justify-content: center; align-items: center; z-index: 100; pointer-events: auto;
         }
-        
-        .ranking-board {
-            width: 80%; max-width: 320px; background: rgba(255,255,255,0.05); border: 1px solid var(--neon);
-            border-radius: 10px; margin: 15px 0; padding: 10px; font-family: 'Courier New', monospace;
-        }
-        .ranking-item { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 16px; color: #aaa; }
-        .ranking-item.latest { color: var(--neon); background: rgba(0, 242, 255, 0.15); font-weight: bold; }
 
         .btn {
-            background: linear-gradient(45deg, var(--neon), #0062ff); color: white; border: none;
-            padding: 15px 40px; font-size: 20px; cursor: pointer; border-radius: 50px;
-            box-shadow: 0 0 20px var(--neon); font-weight: bold; margin: 10px;
+            background: var(--bg); color: var(--text); border: 2px solid var(--text);
+            padding: 12px 30px; font-size: 16px; cursor: pointer; font-weight: bold;
+            box-shadow: 6px 6px 0px var(--neon); margin: 10px; width: 240px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .btn:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px var(--neon); }
+
+        .manual {
+            text-align: left; font-size: 11px; line-height: 1.6; max-width: 320px;
+            background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px;
+            margin-bottom: 20px; border-left: 4px solid var(--neon);
         }
 
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; background: white; z-index: 50; }
-        .shake-heavy { animation: shake-h 0.4s cubic-bezier(.36,.07,.19,.97) both; }
-        @keyframes shake-h { 10%, 90% { transform: translate3d(-5px, -5px, 0); } 20%, 80% { transform: translate3d(8px, 8px, 0); } 30%, 50%, 70% { transform: translate3d(-10px, -10px, 0); } }
-        .frenzy-active { animation: frenzy-glitch 0.2s infinite alternate; }
-        @keyframes frenzy-glitch { from { background: #000; box-shadow: inset 0 0 40px #300; } to { background: #0a0000; box-shadow: inset 0 0 80px #600; } }
+        .shake-heavy { animation: shake 0.4s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-8px, 8px); } 75% { transform: translate(8px, -8px); } }
     </style>
 </head>
-<body id="body">
+<body>
 
 <div id="flash"></div>
 
 <div id="start-screen" class="overlay">
-    <h1 style="font-size: 28px; color: var(--neon); text-shadow: 0 0 20px var(--neon);">DVD PRO STRIKER</h1>
-    <p style="color: var(--gold); font-size: 14px; margin-bottom: 15px;">Mobile Frenzy: 150% Edition</p>
-    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px solid var(--neon); font-size: 12px; text-align: left; width: 85%;">
-        <p>🏆 角ヒット：<span style="color:var(--gold)">10,000pt ＆ タイムスロー</span></p>
-        <p>📦 ブロック：<span style="color:var(--neon)">150% 拡大サイズ</span></p>
-        <p>⚡ 操作：タッチ加速 / 外周タップで衝撃波</p>
+    <h1 style="font-size: 24px; color: var(--neon); letter-spacing: 3px; margin-bottom: 5px;">DVD PRO STRIKER</h1>
+    <p style="font-size: 10px; opacity: 0.6; margin-bottom: 20px;">v6.0 CHAOS STABILIZED</p>
+    
+    <div class="manual">
+        <strong style="color:var(--neon)">【重要仕様：カオスモード】</strong><br>
+        残り10秒から<span style="color:var(--gold)">2秒ごとに3個のユニットが増殖。</span><br>
+        この間のみブロック同士の衝突減点は無効化されます。<br><br>
+        ・角接近: タイムスロー ＆ スポットライト演出<br>
+        ・角ヒット: 虹色DVDズーム(最優先維持演出)<br><br>
+        <strong style="color:var(--neon)">【操作】</strong><br>
+        ■ MOBILE: 指1本目ドラッグで移動、2本目タップで爆破<br>
+        ■ PC: マウスで移動、クリックで爆破
     </div>
-    <button class="btn" onclick="startGame()">MISSION START</button>
+
+    <button class="btn" onclick="initGame('PC')">PC版で開始</button>
+    <button class="btn" onclick="initGame('MOBILE')">モバイル版で開始</button>
 </div>
 
 <div id="result-screen" class="overlay" style="display:none;">
-    <h1 style="color: var(--gold); font-size: 32px; margin:0;">PERSONAL BESTS</h1>
+    <h1 style="font-size: 20px; margin-bottom: 20px;">RANKING</h1>
     <div class="ranking-board" id="ranking-content"></div>
-    <button class="btn" onclick="location.reload()">RETRY</button>
+    <button class="btn" onclick="location.reload()">RE-BOOT</button>
 </div>
 
 <div id="ui-layer">
-    <div id="score-display" class="hud">SCORE: 0<br><small id="best-display">BEST: 0</small></div>
-    <div id="timer-display" class="hud">60</div>
+    <div class="hud-center">
+        <div id="best-display">BEST: 000000</div>
+        <div id="score-display">000000</div>
+        <div id="timer-display">60</div>
+    </div>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -75,93 +104,96 @@
 <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const body = document.getElementById('body');
     const flash = document.getElementById('flash');
     
-    let width, height;
-    let score = 0;
-    let timeLeft = 60;
-    let gameActive = false;
-    let logos = [];
-    let particles = [];
-    let scorePopups = [];
-    let explosions = [];
-    let isTouching = false;
+    let width, height, score = 0, timeLeft = 60, platform = 'PC';
+    let gameActive = false, isTouching = false;
+    let logos = [], particles = [], scorePopups = [], explosions = [];
+    let timeDilation = 1.0, slowMoTimer = 0;
     
-    // スロー演出用
-    let timeDilation = 1.0; 
-    let slowMoTimer = 0;
+    // 【最優先演出：削除禁止】
+    let zoomEffect = { active: false, text: "DVD", life: 0, size: 0, hue: 0, isRainbow: true };
+    let chaosFlash = 0;
+    let spotlightTarget = null;
+    let proximityZoomSize = 40;
 
+    let isSpacePressed = false, isShiftPressed = false;
     const BLAST_COOLDOWN = 3000;
+    const pointer = { x: -1000, y: -1000, rawX: -1000, rawY: -1000, r: 75 };
     let lastBlastTime = 0;
-    const pointer = { x: -1000, y: -1000, rawX: -1000, rawY: -1000, r: 75, mode: 'shield' };
 
     class DVDLogo {
         constructor() {
             this.updateSize();
             this.initPosition();
-            this.color = `hsl(${Math.random()*360}, 80%, 60%)`;
+            this.color = `hsl(${Math.random()*360}, 75%, 60%)`;
             this.history = [];
-            this.stuckTimer = 0; 
         }
         initPosition() {
             this.x = Math.random() * (width - this.w);
             this.y = Math.random() * (height - this.h);
-            this.vx = (Math.random() > 0.5 ? 4 : -4);
-            this.vy = (Math.random() > 0.5 ? 4 : -4);
+            this.vx = (Math.random() > 0.5 ? 4.5 : -4.5);
+            this.vy = (Math.random() > 0.5 ? 4.5 : -4.5);
         }
-        updateSize() { 
-            // 150%サイズ設定 (初期12% * 1.5 = 18%)
-            this.w = width * 0.18; 
-            this.h = this.w * 0.52; 
-        }
+        updateSize() { this.w = width * 0.18; this.h = this.w * 0.52; }
         update(dt) {
-            const actualDt = dt * timeDilation;
-            let speedMod = isTouching ? 2.6 : 0.6;
-            
+            let speedMod = (platform === 'MOBILE') ? (isTouching ? 2.6 : 0.6) : (isSpacePressed ? 3.0 : (isShiftPressed ? 0.3 : 1.0));
             this.x += this.vx * speedMod * timeDilation;
             this.y += this.vy * speedMod * timeDilation;
+            this.history.unshift({x: this.x, y: this.y});
+            if(this.history.length > 8) this.history.pop();
 
-            this.history.push({x: this.x, y: this.y});
-            if(this.history.length > 6) this.history.shift();
+            this.checkProximityToCorner();
 
-            // シールド判定
             let dx = (this.x + this.w/2) - pointer.x;
             let dy = (this.y + this.h/2) - pointer.y;
-            let dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < pointer.r + this.h/2.5) {
+            if (Math.sqrt(dx*dx + dy*dy) < pointer.r + this.h/2) {
                 let angle = Math.atan2(dy, dx);
-                this.vx = Math.cos(angle) * 8; 
-                this.vy = Math.sin(angle) * 8;
+                this.vx = Math.cos(angle) * 8.5; this.vy = Math.sin(angle) * 8.5;
             }
 
-            // 壁・角ヒット
+            explosions.forEach(exp => {
+                let edx = (this.x + this.w/2) - exp.x;
+                let edy = (this.y + this.h/2) - exp.y;
+                if (Math.sqrt(edx*edx + edy*edy) < exp.r + 65) {
+                    let angle = Math.atan2(edy, edx);
+                    this.vx = Math.cos(angle) * 16; this.vy = Math.sin(angle) * 16;
+                }
+            });
+
             let hitW = false, hitH = false;
-            if (this.x <= 0 || this.x + this.w >= width) { 
-                this.vx *= -1; this.x = (this.x <= 0) ? 0 : width-this.w; hitW = true; 
-            }
-            if (this.y <= 0 || this.y + this.h >= height) { 
-                this.vy *= -1; this.y = (this.y <= 0) ? 0 : height-this.h; hitH = true; 
-            }
+            if (this.x <= 0 || this.x + this.w >= width) { this.vx *= -1; this.x = (this.x <= 0) ? 0 : width-this.w; hitW = true; }
+            if (this.y <= 0 || this.y + this.h >= height) { this.vy *= -1; this.y = (this.y <= 0) ? 0 : height-this.h; hitH = true; }
 
             if (hitW && hitH) { 
                 addScore(10000, this.x + this.w/2, this.y + this.h/2); 
-                triggerSuperSlowMo(this.x + this.w/2, this.y + this.h/2);
-            } else if (hitW || hitH) { 
-                addScore(100, this.x + this.w/2, this.y + this.h/2); 
-                vibrate(15);
-            }
-            if (hitW || hitH) this.color = `hsl(${Math.random()*360}, 80%, 60%)`;
+                triggerZoomEffect("DVD", 0.7, true); 
+                spotlightTarget = null;
+            } else if (hitW || hitH) { addScore(100, this.x + this.w/2, this.y + this.h/2); }
+            if (hitW || hitH) this.color = `hsl(${Math.random()*360}, 75%, 60%)`;
         }
+
+        checkProximityToCorner() {
+            const margin = 80; 
+            const nearLeft = this.x < margin;
+            const nearRight = this.x + this.w > width - margin;
+            const nearTop = this.y < margin;
+            const nearBottom = this.y + this.h > height - margin;
+            if ((nearLeft || nearRight) && (nearTop || nearBottom)) {
+                if (timeDilation > 0.1) { timeDilation = 0.1; slowMoTimer = 15; spotlightTarget = { x: this.x + this.w/2, y: this.y + this.h/2 }; }
+            }
+        }
+
         draw() {
-            this.history.forEach((h, i) => { 
-                ctx.globalAlpha = i / 20; ctx.fillStyle = this.color; 
-                ctx.fillRect(h.x, h.y, this.w, this.h); 
+            this.history.forEach((h, i) => {
+                ctx.globalAlpha = (1 - i/8) * 0.2;
+                ctx.fillStyle = this.color; ctx.fillRect(h.x, h.y, this.w, this.h);
             });
-            ctx.globalAlpha = 1; ctx.shadowBlur = 15; ctx.shadowColor = this.color;
-            ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.w, this.h);
-            ctx.shadowBlur = 0; ctx.fillStyle = "#000"; ctx.font = `bold ${this.w*0.25}px Arial`; 
-            ctx.textAlign = "center"; ctx.fillText("DVD", this.x + this.w/2, this.y + this.h*0.7);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = "#0a0a0a"; ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.strokeStyle = this.color; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+            ctx.fillStyle = this.color; ctx.font = `bold ${this.w*0.3}px sans-serif`; ctx.textAlign = "center";
+            ctx.fillText("DVD", this.x + this.w/2, this.y + this.h*0.68);
         }
     }
 
@@ -174,163 +206,241 @@
 
     function updateScoreUI() {
         const best = parseInt(localStorage.getItem('dvdBest_0') || 0);
-        document.getElementById('score-display').innerHTML = `SCORE: ${score.toLocaleString()}<br><small>BEST: ${best.toLocaleString()}</small>`;
+        document.getElementById('score-display').innerText = score.toString().padStart(6, '0');
+        document.getElementById('best-display').innerText = "BEST: " + best.toString().padStart(6, '0');
     }
 
-    function triggerSuperSlowMo(x, y) {
-        timeDilation = 0.05; slowMoTimer = 80;
-        flash.style.opacity = '0.7'; setTimeout(() => flash.style.opacity = '0', 200);
-        body.classList.add('shake-heavy'); setTimeout(() => body.classList.remove('shake-heavy'), 450);
-        vibrate([80, 40, 80]);
-        for(let i=0; i<40; i++) {
-            particles.push({x, y, vx:(Math.random()-0.5)*18, vy:(Math.random()-0.5)*18, life:1.2, color:'#ffd700'});
+    function triggerZoomEffect(text, durationSec, rainbow = true) {
+        const frameCount = durationSec * 60;
+        timeDilation = 0.05; slowMoTimer = frameCount; 
+        zoomEffect.active = true;
+        zoomEffect.text = text;
+        zoomEffect.life = frameCount;
+        zoomEffect.size = rainbow ? 20 : width * 0.05; 
+        zoomEffect.hue = 0;
+        zoomEffect.isRainbow = rainbow;
+        if (rainbow) {
+            flash.style.opacity = '0.5'; setTimeout(() => flash.style.opacity = '0', 200);
+            document.body.classList.add('shake-heavy'); setTimeout(() => document.body.classList.remove('shake-heavy'), 400);
         }
     }
 
-    function vibrate(p) { if (navigator.vibrate) navigator.vibrate(p); }
+    function initGame(mode) {
+        platform = mode;
+        document.getElementById('start-screen').style.display = 'none';
+        startGame();
+    }
 
     function startGame() { 
-        document.getElementById('start-screen').style.display = 'none'; 
         gameActive = true; 
+        logos = [new DVDLogo()];
         const timer = setInterval(() => {
             if (!gameActive) { clearInterval(timer); return; }
             if (timeDilation > 0.4) {
-                timeLeft--; document.getElementById('timer-display').innerText = timeLeft;
-            }
-            if (timeLeft <= 10) {
-                body.classList.add('frenzy-active');
-                if (timeLeft % 2 === 0 && timeDilation > 0.5) { for(let i=0; i<3; i++) logos.push(new DVDLogo()); }
-            }
-            if (timeLeft <= 0) { gameActive = false; showResult(); }
-        }, 1000);
-    }
-
-    function showResult() {
-        body.classList.remove('frenzy-active');
-        let history = [];
-        for(let i=0; i<5; i++) {
-            let s = parseInt(localStorage.getItem('dvdBest_'+i) || 0);
-            if(s > 0) history.push(s);
-        }
-        history.push(score);
-        history.sort((a, b) => b - a);
-        history = history.slice(0, 5);
-        for(let i=0; i<history.length; i++) localStorage.setItem('dvdBest_'+i, history[i]);
-
-        const content = document.getElementById('ranking-content');
-        content.innerHTML = '<div style="font-size:11px; margin-bottom:10px; opacity:0.6;">LOCAL TOP 5</div>';
-        history.forEach((s, index) => {
-            content.innerHTML += `<div class="ranking-item ${s === score ? 'latest':''}"><span>${index + 1}位</span><span>${s.toLocaleString()} PT</span></div>`;
-        });
-        document.getElementById('result-screen').style.display = 'flex';
-    }
-
-    function handleInput(e) {
-        if (!gameActive) return;
-        e.preventDefault(); isTouching = true;
-        const t = e.touches ? e.touches[0] : e;
-        pointer.rawX = t.clientX; pointer.rawY = t.clientY;
-        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
-        const dx = pointer.rawX - centerX, dy = pointer.rawY - centerY;
-        if ((dx**2/rx**2) + (dy**2/ry**2) <= 1) {
-            pointer.x = pointer.rawX; pointer.y = pointer.rawY; pointer.mode = 'shield';
-        } else {
-            let angle = Math.atan2(dy * rx, dx * ry);
-            pointer.x = centerX + rx * Math.cos(angle); pointer.y = centerY + ry * Math.sin(angle);
-            pointer.mode = 'target';
-        }
-    }
-
-    function handleTap(e) {
-        if (!gameActive) return;
-        const t = e.changedTouches ? e.changedTouches[0] : e;
-        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
-        const dx = t.clientX - centerX, dy = t.clientY - centerY;
-        if ((dx**2/rx**2) + (dy**2/ry**2) > 1) {
-            const now = Date.now();
-            if (now - lastBlastTime > BLAST_COOLDOWN) {
-                lastBlastTime = now;
-                explosions.push({x: t.clientX, y: t.clientY, r: 0, life: 1.0});
-                vibrate(40);
-            }
-        }
-    }
-
-    let lastTime = performance.now();
-    function animate(time) {
-        const dt = time - lastTime; lastTime = time;
-        if (slowMoTimer > 0) {
-            slowMoTimer--; timeDilation += (1.0 - timeDilation) * 0.06; 
-        } else { timeDilation = 1.0; }
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.fillRect(0, 0, width, height);
-        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
-        ctx.strokeStyle = 'rgba(0, 242, 255, 0.1)'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.ellipse(centerX, centerY, rx, ry, 0, 0, Math.PI*2); ctx.stroke();
-
-        if (gameActive) {
-            if (timeLeft > 10) {
-                for (let i = 0; i < logos.length; i++) {
-                    for (let j = i + 1; j < logos.length; j++) {
-                        let a = logos[i], b = logos[j];
-                        if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
-                            addScore(-100, a.x + a.w/2, a.y + a.h/2);
-                            let angle = Math.atan2(b.y - a.y, b.x - a.x);
-                            a.vx -= Math.cos(angle) * 3; a.vy -= Math.sin(angle) * 3;
-                            b.vx += Math.cos(angle) * 3; b.vy += Math.sin(angle) * 3;
+                timeLeft--; 
+                document.getElementById('timer-display').innerText = timeLeft;
+                
+                // --- 段階的投入 ---
+                if (timeLeft === 45) logos.push(new DVDLogo()); 
+                if (timeLeft === 30) logos.push(new DVDLogo()); 
+                
+                // --- 【復元】ラスト10秒増殖ロジック（PC/Mobile共通・確実に動作） ---
+                if (timeLeft <= 10 && timeLeft > 0) {
+                    // 1秒ごとの白色カウントダウン演出
+                    triggerZoomEffect(timeLeft.toString(), 0.5, false);
+                    
+                    // 2秒ごとに3個増殖
+                    if (timeLeft % 2 === 0) {
+                        for(let i=0; i<3; i++) {
+                            logos.push(new DVDLogo());
                         }
                     }
                 }
             }
-            logos.forEach(l => { l.update(dt); l.draw(); });
-        }
+            if (timeLeft <= 0) { gameActive = false; showResult(); }
+        }, 1000);
+        requestAnimationFrame(animate);
+    }
 
-        explosions = explosions.filter(e => e.life > 0);
-        explosions.forEach(e => { 
-            e.r += 10 * timeDilation; e.life -= 0.03 * timeDilation; 
-            ctx.strokeStyle = `rgba(255, 62, 62, ${e.life})`; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke(); 
+    function showResult() {
+        let history = [];
+        for(let i=0; i<5; i++) history.push(parseInt(localStorage.getItem('dvdBest_'+i) || 0));
+        history.push(score);
+        history.sort((a, b) => b - a);
+        history = history.slice(0, 5);
+        for(let i=0; i<5; i++) localStorage.setItem('dvdBest_'+i, history[history.length - 1 - i] === score ? score : history[i]); 
+        // 実際は単純に上書きでOK
+        for(let i=0; i<history.length; i++) localStorage.setItem('dvdBest_'+i, history[i]);
+
+        const content = document.getElementById('ranking-content');
+        content.innerHTML = '';
+        history.forEach((s, i) => {
+            content.innerHTML += `<div class="ranking-item ${s === score ? 'latest' : ''}"><span>RANK #0${i+1}</span><span>${s.toLocaleString()}</span></div>`;
         });
+        document.getElementById('result-screen').style.display = 'flex';
+    }
 
-        if (isTouching) {
-            const blastRatio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN);
-            ctx.save(); ctx.translate(pointer.rawX, pointer.rawY);
-            ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 3; ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.stroke();
-            ctx.beginPath(); ctx.strokeStyle = blastRatio === 1 ? '#ffd700' : '#ff3e3e';
-            ctx.arc(0, 0, 25, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*blastRatio)); ctx.stroke(); ctx.restore();
-            if (pointer.mode === 'shield') {
-                ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
-                ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    function updatePointerPos(inputX, inputY) {
+        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
+        const dx = inputX - centerX, dy = inputY - centerY;
+        pointer.rawX = inputX; pointer.rawY = inputY;
+        if ((dx**2/rx**2) + (dy**2/ry**2) <= 1) { pointer.x = inputX; pointer.y = inputY; }
+        else {
+            let angle = Math.atan2(dy * rx, dx * ry);
+            pointer.x = centerX + rx * Math.cos(angle);
+            pointer.y = centerY + ry * Math.sin(angle);
+        }
+    }
+
+    function triggerBlast(x, y, force = false) {
+        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
+        if (force || ((x-centerX)**2/rx**2) + ((y-centerY)**2/ry**2) > 1) {
+            const now = Date.now();
+            if (now - lastBlastTime > BLAST_COOLDOWN) {
+                lastBlastTime = now;
+                explosions.push({x, y, r: 0, life: 1.0});
+                if (platform === 'MOBILE') navigator.vibrate(30);
+            }
+        }
+    }
+
+    window.addEventListener('mousemove', e => { if (platform === 'PC') updatePointerPos(e.clientX, e.clientY); });
+    window.addEventListener('mousedown', e => { if (platform === 'PC') triggerBlast(e.clientX, e.clientY); });
+    window.addEventListener('keydown', e => { if (e.code === 'Space') isSpacePressed = true; if (e.key === 'Shift') isShiftPressed = true; });
+    window.addEventListener('keyup', e => { if (e.code === 'Space') isSpacePressed = false; if (e.key === 'Shift') isShiftPressed = false; });
+
+    canvas.addEventListener('touchstart', e => { 
+        e.preventDefault(); 
+        if (platform === 'MOBILE') {
+            isTouching = true;
+            updatePointerPos(e.touches[0].clientX, e.touches[0].clientY);
+            if (e.touches.length > 1) triggerBlast(e.touches[1].clientX, e.touches[1].clientY, true);
+        }
+    }, {passive: false});
+    canvas.addEventListener('touchmove', e => { e.preventDefault(); if (platform === 'MOBILE') updatePointerPos(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+    canvas.addEventListener('touchend', e => { if (e.touches.length === 0) { isTouching = false; pointer.x = pointer.y = -1000; } });
+
+    function animate() {
+        if (!gameActive) return;
+        const currentTarget = spotlightTarget;
+        spotlightTarget = null; 
+
+        if (slowMoTimer > 0) { slowMoTimer--; timeDilation += (1.0 - timeDilation) * 0.12; } else { timeDilation = 1.0; }
+        
+        ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, width, height);
+
+        // 背景グリッド
+        ctx.strokeStyle = "rgba(0, 242, 255, 0.1)"; ctx.lineWidth = 1;
+        for(let x=0; x<width; x+=50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,height); ctx.stroke(); }
+        for(let y=0; y<height; y+=50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(width,y); ctx.stroke(); }
+
+        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
+        ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.beginPath(); ctx.ellipse(centerX, centerY, rx, ry, 0, 0, Math.PI*2); ctx.stroke();
+
+        if (timeLeft <= 10) {
+            chaosFlash += 0.1;
+            if (Math.sin(chaosFlash * 10) > 0) {
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                ctx.lineWidth = 15; ctx.strokeRect(0, 0, width, height);
             }
         }
 
-        particles = particles.filter(p => p.life > 0);
+        // 衝突判定 (10秒以下は無効)
+        if (timeLeft > 10) {
+            for (let i = 0; i < logos.length; i++) {
+                for (let j = i + 1; j < logos.length; j++) {
+                    let a = logos[i], b = logos[j];
+                    if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
+                        addScore(-100, a.x + a.w/2, a.y + a.h/2);
+                        let ang = Math.atan2(b.y - a.y, b.x - a.x);
+                        a.vx -= Math.cos(ang) * 3.5; a.vy -= Math.sin(ang) * 3.5;
+                        b.vx += Math.cos(ang) * 3.5; b.vy += Math.sin(ang) * 3.5;
+                    }
+                }
+            }
+        }
+
+        logos.forEach(l => { l.update(16); l.draw(); });
+
+        // ソフトスポットライト
+        if (currentTarget && !zoomEffect.active) {
+            ctx.save();
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = width; maskCanvas.height = height;
+            const mctx = maskCanvas.getContext('2d');
+            mctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            mctx.fillRect(0, 0, width, height);
+            mctx.globalCompositeOperation = 'destination-out';
+            const grad = mctx.createRadialGradient(currentTarget.x, currentTarget.y, 0, currentTarget.x, currentTarget.y, 250);
+            grad.addColorStop(0, 'rgba(0,0,0,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            mctx.fillStyle = grad;
+            mctx.beginPath(); mctx.arc(currentTarget.x, currentTarget.y, 250, 0, Math.PI * 2); mctx.fill();
+            ctx.drawImage(maskCanvas, 0, 0);
+            ctx.restore();
+            proximityZoomSize += 1.5;
+            ctx.save();
+            ctx.textAlign = "center"; ctx.font = `bold ${proximityZoomSize}px sans-serif`;
+            ctx.fillStyle = `rgba(255, 255, 255, 0.25)`;
+            ctx.fillText("DVD", width/2, height/2 + proximityZoomSize/3);
+            ctx.restore();
+        } else { proximityZoomSize = 40; }
+
+        explosions = explosions.filter(e => e.life > 0);
+        explosions.forEach(e => { 
+            e.r += 12; e.life -= 0.04; ctx.strokeStyle = "#ff3e3e"; ctx.globalAlpha = e.life;
+            ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke(); 
+        });
+
+        if (zoomEffect.active) {
+            zoomEffect.life--;
+            zoomEffect.size += width * 0.038; zoomEffect.hue += 15;
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, zoomEffect.life / 20);
+            ctx.textAlign = "center";
+            ctx.font = `italic bold ${zoomEffect.size}px sans-serif`;
+            if (zoomEffect.isRainbow) {
+                ctx.fillStyle = `hsl(${zoomEffect.hue % 360}, 100%, 70%)`;
+                ctx.shadowBlur = 40; ctx.shadowColor = ctx.fillStyle;
+            } else { ctx.fillStyle = "#ffffff"; ctx.shadowBlur = 20; ctx.shadowColor = "#fff"; }
+            ctx.fillText(zoomEffect.text, width/2, height/2 + zoomEffect.size/3);
+            ctx.restore();
+            if (zoomEffect.life <= 0) zoomEffect.active = false;
+        }
+
+        const ratio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN);
+        ctx.save(); ctx.translate(pointer.rawX, pointer.rawY);
+        const col = ratio === 1 ? "#00f2ff" : "#ff3e3e";
+        ctx.strokeStyle = ratio === 1 ? "#00f2ff" : "#444"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 18, -Math.PI/2, (-Math.PI/2)+(Math.PI*2*ratio)); ctx.stroke();
+        ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(12,0); ctx.moveTo(0,-12); ctx.lineTo(0,12); ctx.stroke();
+        ctx.restore();
+
+        if (pointer.x !== -1000) {
+            ctx.strokeStyle = "#00f2ff"; ctx.globalAlpha = 0.4; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke();
+        }
+
         particles.forEach(p => { 
-            ctx.fillStyle = p.color; ctx.globalAlpha = p.life; 
-            ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill(); 
-            p.x += p.vx * timeDilation; p.y += p.vy * timeDilation; p.life -= 0.01 * timeDilation; 
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); 
+            p.x += p.vx * timeDilation; p.y += p.vy * timeDilation; p.life -= 0.02; 
         });
+        particles = particles.filter(p => p.life > 0);
         
-        scorePopups = scorePopups.filter(s => s.life > 0);
         scorePopups.forEach(s => { 
-            ctx.fillStyle = s.val >= 1000 ? '#ffd700' : (s.val > 0 ? "#0f0" : "#f33"); 
-            ctx.globalAlpha = s.life; ctx.font = `bold ${s.val >= 1000 ? 30 : 20}px Arial`; 
-            ctx.fillText((s.val>0?"+":"")+s.val.toLocaleString(), s.x, s.y); 
-            s.y -= 1 * timeDilation; s.life -= 0.02 * timeDilation; 
+            const isMinus = s.val < 0;
+            ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; ctx.globalAlpha = s.life; 
+            ctx.font = `bold ${isMinus ? 32 : 30}px sans-serif`; ctx.textAlign = "center";
+            ctx.fillText((s.val > 0 ? "+" : "") + s.val, s.x, s.y); s.y -= 1.2; s.life -= 0.02; 
         });
-        ctx.globalAlpha = 1;
+        scorePopups = scorePopups.filter(s => s.life > 0);
+
         requestAnimationFrame(animate);
     }
 
     window.addEventListener('resize', () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; logos.forEach(l => l.updateSize()); });
-    canvas.addEventListener('touchstart', handleInput);
-    canvas.addEventListener('touchmove', handleInput);
-    canvas.addEventListener('touchend', (e) => { isTouching = false; handleTap(e); pointer.x = pointer.y = -1000; });
-
     width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight;
-    for(let i=0; i<3; i++) logos.push(new DVDLogo());
     updateScoreUI();
-    requestAnimationFrame(animate);
 </script>
 </body>
 </html>
