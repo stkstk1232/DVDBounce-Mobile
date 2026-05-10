@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DVD Pro Striker: Ultimate Chaos Fix</title>
+    <title>DVD Pro Striker: Transcendence Final</title>
     <style>
         :root {
             --neon: #00f2ff;
@@ -52,14 +52,14 @@
         .btn:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px var(--neon); }
 
         .manual {
-            text-align: left; font-size: 11px; line-height: 1.6; max-width: 320px;
-            background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px;
-            margin-bottom: 20px; border-left: 4px solid var(--neon);
+            text-align: left; font-size: 11px; line-height: 1.5; max-width: 330px;
+            background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;
+            margin-bottom: 15px; border-left: 4px solid var(--neon);
         }
 
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; background: white; z-index: 50; }
         .shake-heavy { animation: shake 0.4s ease-in-out; }
-        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-8px, 8px); } 75% { transform: translate(8px, -8px); } }
+        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-6px, 6px); } 75% { transform: translate(6px, -8px); } }
     </style>
 </head>
 <body>
@@ -68,26 +68,25 @@
 
 <div id="start-screen" class="overlay">
     <h1 style="font-size: 24px; color: var(--neon); letter-spacing: 3px; margin-bottom: 5px;">DVD PRO STRIKER</h1>
-    <p style="font-size: 10px; opacity: 0.6; margin-bottom: 20px;">v6.0 CHAOS STABILIZED</p>
+    <p style="font-size: 10px; opacity: 0.6; margin-bottom: 15px;">v10.0 FINAL TRANSCENDENCE</p>
     
     <div class="manual">
-        <strong style="color:var(--neon)">【重要仕様：カオスモード】</strong><br>
-        残り10秒から<span style="color:var(--gold)">2秒ごとに3個のユニットが増殖。</span><br>
-        この間のみブロック同士の衝突減点は無効化されます。<br><br>
-        ・角接近: タイムスロー ＆ スポットライト演出<br>
-        ・角ヒット: 虹色DVDズーム(最優先維持演出)<br><br>
-        <strong style="color:var(--neon)">【操作】</strong><br>
-        ■ MOBILE: 指1本目ドラッグで移動、2本目タップで爆破<br>
-        ■ PC: マウスで移動、クリックで爆破
+        <strong style="color:var(--gold)">【カオスモード：残り10秒】</strong><br>
+        ・<span style="color:var(--gold)">2秒ごとに3基増殖</span> (絶対維持)<br>
+        ・ラスト5秒：ネオン・ドレイン(モノクロ)<br><br>
+        <strong style="color:var(--neon)">【能汁システム】</strong><br>
+        ・角ヒット：虹色ズーム & 全画面衝撃波 & 磁力<br>
+        ・角接近：スロー & スポットライト & 心音演出<br>
+        ・コンボ：倍率UP & グリッチノイズ
     </div>
 
-    <button class="btn" onclick="initGame('PC')">PC版で開始</button>
-    <button class="btn" onclick="initGame('MOBILE')">モバイル版で開始</button>
+    <button class="btn" onclick="initGame('PC')">PC TERMINAL</button>
+    <button class="btn" onclick="initGame('MOBILE')">MOBILE UNIT</button>
 </div>
 
 <div id="result-screen" class="overlay" style="display:none;">
     <h1 style="font-size: 20px; margin-bottom: 20px;">RANKING</h1>
-    <div class="ranking-board" id="ranking-content"></div>
+    <div class="ranking-board" id="ranking-content" style="width:280px; border:1px solid var(--text); background:var(--panel);"></div>
     <button class="btn" onclick="location.reload()">RE-BOOT</button>
 </div>
 
@@ -111,11 +110,14 @@
     let logos = [], particles = [], scorePopups = [], explosions = [];
     let timeDilation = 1.0, slowMoTimer = 0;
     
-    // 【最優先演出：削除禁止】
+    let comboCount = 0, lastHitTime = 0, comboDisplayLife = 0;
     let zoomEffect = { active: false, text: "DVD", life: 0, size: 0, hue: 0, isRainbow: true };
-    let chaosFlash = 0;
-    let spotlightTarget = null;
-    let proximityZoomSize = 40;
+    let chaosFlash = 0, spotlightTarget = null, proximityZoomSize = 40;
+    let warpOffset = 0, gridDistortion = 0;
+
+    // --- 追加演出管理用変数 (6-10) ---
+    let heartRate = 0;      // ⑥心音
+    let glitchActive = 0;   // ⑦グリッチ
 
     let isSpacePressed = false, isShiftPressed = false;
     const BLAST_COOLDOWN = 3000;
@@ -128,6 +130,7 @@
             this.initPosition();
             this.color = `hsl(${Math.random()*360}, 75%, 60%)`;
             this.history = [];
+            this.rainbowHue = Math.random() * 360;
         }
         initPosition() {
             this.x = Math.random() * (width - this.w);
@@ -166,41 +169,59 @@
             if (this.y <= 0 || this.y + this.h >= height) { this.vy *= -1; this.y = (this.y <= 0) ? 0 : height-this.h; hitH = true; }
 
             if (hitW && hitH) { 
-                addScore(10000, this.x + this.w/2, this.y + this.h/2); 
+                triggerCombo(true);
+                addScore(10000 * (1 + comboCount * 0.1), this.x + this.w/2, this.y + this.h/2); 
                 triggerZoomEffect("DVD", 0.7, true); 
-                spotlightTarget = null;
-            } else if (hitW || hitH) { addScore(100, this.x + this.w/2, this.y + this.h/2); }
+                gridDistortion = 50; spotlightTarget = null;
+
+                // ⑧ 衝撃波フィニッシュ & ⑩ パーティクル生成
+                explosions.push({x: this.x + this.w/2, y: this.y + this.h/2, r: 0, life: 1.0, isFinishWave: true});
+                for(let i=0; i<30; i++) particles.push({x: this.x+this.w/2, y: this.y+this.h/2, vx:(Math.random()-0.5)*20, vy:(Math.random()-0.5)*20, life:1.0, color:varColor('--gold'), isMagnet: true});
+
+            } else if (hitW || hitH) { 
+                triggerCombo(false);
+                addScore(100 * (1 + comboCount * 0.1), this.x + this.w/2, this.y + this.h/2); 
+            }
             if (hitW || hitH) this.color = `hsl(${Math.random()*360}, 75%, 60%)`;
         }
 
         checkProximityToCorner() {
             const margin = 80; 
-            const nearLeft = this.x < margin;
-            const nearRight = this.x + this.w > width - margin;
-            const nearTop = this.y < margin;
-            const nearBottom = this.y + this.h > height - margin;
+            const nearLeft = this.x < margin, nearRight = this.x + this.w > width - margin;
+            const nearTop = this.y < margin, nearBottom = this.y + this.h > height - margin;
             if ((nearLeft || nearRight) && (nearTop || nearBottom)) {
                 if (timeDilation > 0.1) { timeDilation = 0.1; slowMoTimer = 15; spotlightTarget = { x: this.x + this.w/2, y: this.y + this.h/2 }; }
             }
         }
 
         draw() {
+            this.rainbowHue += 5;
             this.history.forEach((h, i) => {
                 ctx.globalAlpha = (1 - i/8) * 0.2;
-                ctx.fillStyle = this.color; ctx.fillRect(h.x, h.y, this.w, this.h);
+                ctx.fillStyle = (timeLeft <= 10) ? `hsl(${(this.rainbowHue-i*10)%360}, 100%, 70%)` : this.color;
+                ctx.fillRect(h.x, h.y, this.w, this.h);
             });
             ctx.globalAlpha = 1;
             ctx.fillStyle = "#0a0a0a"; ctx.fillRect(this.x, this.y, this.w, this.h);
-            ctx.strokeStyle = this.color; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
-            ctx.fillStyle = this.color; ctx.font = `bold ${this.w*0.3}px sans-serif`; ctx.textAlign = "center";
+            ctx.strokeStyle = (timeLeft <= 10) ? `hsl(${this.rainbowHue%360}, 100%, 70%)` : this.color;
+            ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+            ctx.fillStyle = ctx.strokeStyle; ctx.font = `bold ${this.w*0.3}px sans-serif`; ctx.textAlign = "center";
             ctx.fillText("DVD", this.x + this.w/2, this.y + this.h*0.68);
         }
     }
 
+    function triggerCombo(isCorner) {
+        const now = Date.now();
+        if (now - lastHitTime < 3000) comboCount++; else comboCount = 1;
+        lastHitTime = now; comboDisplayLife = 60;
+        // ⑦ コンボランクに応じたグリッチ
+        if (comboCount % 5 === 0) glitchActive = 15;
+    }
+
     function addScore(pts, x, y) {
         if (!gameActive) return;
-        score += pts;
-        scorePopups.push({x, y, val: pts, life: 1.0});
+        score += Math.floor(pts);
+        scorePopups.push({x, y, val: Math.floor(pts), life: 1.0});
         updateScoreUI();
     }
 
@@ -213,23 +234,15 @@
     function triggerZoomEffect(text, durationSec, rainbow = true) {
         const frameCount = durationSec * 60;
         timeDilation = 0.05; slowMoTimer = frameCount; 
-        zoomEffect.active = true;
-        zoomEffect.text = text;
-        zoomEffect.life = frameCount;
-        zoomEffect.size = rainbow ? 20 : width * 0.05; 
-        zoomEffect.hue = 0;
-        zoomEffect.isRainbow = rainbow;
+        zoomEffect.active = true; zoomEffect.text = text; zoomEffect.life = frameCount;
+        zoomEffect.size = rainbow ? 20 : width * 0.05; zoomEffect.hue = 0; zoomEffect.isRainbow = rainbow;
         if (rainbow) {
             flash.style.opacity = '0.5'; setTimeout(() => flash.style.opacity = '0', 200);
             document.body.classList.add('shake-heavy'); setTimeout(() => document.body.classList.remove('shake-heavy'), 400);
         }
     }
 
-    function initGame(mode) {
-        platform = mode;
-        document.getElementById('start-screen').style.display = 'none';
-        startGame();
-    }
+    function initGame(mode) { platform = mode; document.getElementById('start-screen').style.display = 'none'; startGame(); }
 
     function startGame() { 
         gameActive = true; 
@@ -239,21 +252,13 @@
             if (timeDilation > 0.4) {
                 timeLeft--; 
                 document.getElementById('timer-display').innerText = timeLeft;
-                
-                // --- 段階的投入 ---
                 if (timeLeft === 45) logos.push(new DVDLogo()); 
                 if (timeLeft === 30) logos.push(new DVDLogo()); 
                 
-                // --- 【復元】ラスト10秒増殖ロジック（PC/Mobile共通・確実に動作） ---
                 if (timeLeft <= 10 && timeLeft > 0) {
-                    // 1秒ごとの白色カウントダウン演出
-                    triggerZoomEffect(timeLeft.toString(), 0.5, false);
-                    
-                    // 2秒ごとに3個増殖
+                    triggerZoomEffect(timeLeft.toString(), 0.5, false); 
                     if (timeLeft % 2 === 0) {
-                        for(let i=0; i<3; i++) {
-                            logos.push(new DVDLogo());
-                        }
+                        for(let i=0; i<3; i++) logos.push(new DVDLogo());
                     }
                 }
             }
@@ -265,19 +270,11 @@
     function showResult() {
         let history = [];
         for(let i=0; i<5; i++) history.push(parseInt(localStorage.getItem('dvdBest_'+i) || 0));
-        history.push(score);
-        history.sort((a, b) => b - a);
-        history = history.slice(0, 5);
-        for(let i=0; i<5; i++) localStorage.setItem('dvdBest_'+i, history[history.length - 1 - i] === score ? score : history[i]); 
-        // 実際は単純に上書きでOK
-        for(let i=0; i<history.length; i++) localStorage.setItem('dvdBest_'+i, history[i]);
-
-        const content = document.getElementById('ranking-content');
-        content.innerHTML = '';
-        history.forEach((s, i) => {
-            content.innerHTML += `<div class="ranking-item ${s === score ? 'latest' : ''}"><span>RANK #0${i+1}</span><span>${s.toLocaleString()}</span></div>`;
-        });
+        history.push(score); history.sort((a, b) => b - a);
+        for(let i=0; i<5; i++) localStorage.setItem('dvdBest_'+i, history[i]);
         document.getElementById('result-screen').style.display = 'flex';
+        const content = document.getElementById('ranking-content');
+        content.innerHTML = history.map((s,i)=>`<div class="ranking-item" style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px dashed var(--text); ${s===score?'background:var(--neon); color:#000;':''}"><span>#0${i+1}</span><span>${s.toLocaleString()}</span></div>`).join('');
     }
 
     function updatePointerPos(inputX, inputY) {
@@ -285,22 +282,14 @@
         const dx = inputX - centerX, dy = inputY - centerY;
         pointer.rawX = inputX; pointer.rawY = inputY;
         if ((dx**2/rx**2) + (dy**2/ry**2) <= 1) { pointer.x = inputX; pointer.y = inputY; }
-        else {
-            let angle = Math.atan2(dy * rx, dx * ry);
-            pointer.x = centerX + rx * Math.cos(angle);
-            pointer.y = centerY + ry * Math.sin(angle);
-        }
+        else { let angle = Math.atan2(dy * rx, dx * ry); pointer.x = centerX + rx * Math.cos(angle); pointer.y = centerY + ry * Math.sin(angle); }
     }
 
     function triggerBlast(x, y, force = false) {
         const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
         if (force || ((x-centerX)**2/rx**2) + ((y-centerY)**2/ry**2) > 1) {
             const now = Date.now();
-            if (now - lastBlastTime > BLAST_COOLDOWN) {
-                lastBlastTime = now;
-                explosions.push({x, y, r: 0, life: 1.0});
-                if (platform === 'MOBILE') navigator.vibrate(30);
-            }
+            if (now - lastBlastTime > BLAST_COOLDOWN) { lastBlastTime = now; explosions.push({x, y, r: 0, life: 1.0}); if (platform === 'MOBILE') navigator.vibrate(30); }
         }
     }
 
@@ -308,50 +297,39 @@
     window.addEventListener('mousedown', e => { if (platform === 'PC') triggerBlast(e.clientX, e.clientY); });
     window.addEventListener('keydown', e => { if (e.code === 'Space') isSpacePressed = true; if (e.key === 'Shift') isShiftPressed = true; });
     window.addEventListener('keyup', e => { if (e.code === 'Space') isSpacePressed = false; if (e.key === 'Shift') isShiftPressed = false; });
-
-    canvas.addEventListener('touchstart', e => { 
-        e.preventDefault(); 
-        if (platform === 'MOBILE') {
-            isTouching = true;
-            updatePointerPos(e.touches[0].clientX, e.touches[0].clientY);
-            if (e.touches.length > 1) triggerBlast(e.touches[1].clientX, e.touches[1].clientY, true);
-        }
-    }, {passive: false});
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); if (platform === 'MOBILE') { isTouching = true; updatePointerPos(e.touches[0].clientX, e.touches[0].clientY); if (e.touches.length > 1) triggerBlast(e.touches[1].clientX, e.touches[1].clientY, true); } }, {passive: false});
     canvas.addEventListener('touchmove', e => { e.preventDefault(); if (platform === 'MOBILE') updatePointerPos(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
     canvas.addEventListener('touchend', e => { if (e.touches.length === 0) { isTouching = false; pointer.x = pointer.y = -1000; } });
 
     function animate() {
         if (!gameActive) return;
-        const currentTarget = spotlightTarget;
-        spotlightTarget = null; 
-
+        const currentTarget = spotlightTarget; spotlightTarget = null;
         if (slowMoTimer > 0) { slowMoTimer--; timeDilation += (1.0 - timeDilation) * 0.12; } else { timeDilation = 1.0; }
         
+        // ⑨ ネオン・ドレイン（ラスト5秒モノクロ）
+        if (timeLeft <= 5) ctx.filter = 'grayscale(100%) brightness(1.2)';
+        else ctx.filter = 'none';
+
         ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, width, height);
 
-        // 背景グリッド
-        ctx.strokeStyle = "rgba(0, 242, 255, 0.1)"; ctx.lineWidth = 1;
-        for(let x=0; x<width; x+=50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,height); ctx.stroke(); }
-        for(let y=0; y<height; y+=50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(width,y); ctx.stroke(); }
+        // 背景描画
+        warpOffset += (timeLeft <= 10) ? 20 : 1; gridDistortion *= 0.9;
+        ctx.save(); ctx.strokeStyle = (timeLeft <= 10) ? "rgba(255,255,255,0.3)" : "rgba(0, 242, 255, 0.1)";
+        for(let x=-100; x<width+100; x+=50) { ctx.beginPath(); for(let y=0; y<height; y+=10) ctx.lineTo(x + Math.sin((y + warpOffset)/50)*gridDistortion, y); ctx.stroke(); }
+        for(let y=-100; y<height+100; y+=50) { ctx.beginPath(); for(let x=0; x<width; x+=10) ctx.lineTo(x, y + Math.cos((x + warpOffset)/50)*gridDistortion + (timeLeft <= 10 ? (warpOffset % 50) : 0)); ctx.stroke(); }
+        ctx.restore();
 
         const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
         ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.beginPath(); ctx.ellipse(centerX, centerY, rx, ry, 0, 0, Math.PI*2); ctx.stroke();
 
-        if (timeLeft <= 10) {
-            chaosFlash += 0.1;
-            if (Math.sin(chaosFlash * 10) > 0) {
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-                ctx.lineWidth = 15; ctx.strokeRect(0, 0, width, height);
-            }
-        }
+        if (timeLeft <= 10 && Math.sin(Date.now()/50) > 0) { ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.lineWidth = 15; ctx.strokeRect(0, 0, width, height); }
 
-        // 衝突判定 (10秒以下は無効)
         if (timeLeft > 10) {
             for (let i = 0; i < logos.length; i++) {
                 for (let j = i + 1; j < logos.length; j++) {
                     let a = logos[i], b = logos[j];
                     if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
-                        addScore(-100, a.x + a.w/2, a.y + a.h/2);
+                        addScore(-100, a.x + a.w/2, a.y + a.h/2); comboCount = 0; comboDisplayLife = 0;
                         let ang = Math.atan2(b.y - a.y, b.x - a.x);
                         a.vx -= Math.cos(ang) * 3.5; a.vy -= Math.sin(ang) * 3.5;
                         b.vx += Math.cos(ang) * 3.5; b.vy += Math.sin(ang) * 3.5;
@@ -362,82 +340,85 @@
 
         logos.forEach(l => { l.update(16); l.draw(); });
 
-        // ソフトスポットライト
+        // スポットライト演出 & ⑥ 心音
         if (currentTarget && !zoomEffect.active) {
             ctx.save();
-            const maskCanvas = document.createElement('canvas');
-            maskCanvas.width = width; maskCanvas.height = height;
-            const mctx = maskCanvas.getContext('2d');
-            mctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            mctx.fillRect(0, 0, width, height);
+            const maskCanvas = document.createElement('canvas'); maskCanvas.width = width; maskCanvas.height = height;
+            const mctx = maskCanvas.getContext('2d'); mctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; mctx.fillRect(0, 0, width, height);
             mctx.globalCompositeOperation = 'destination-out';
             const grad = mctx.createRadialGradient(currentTarget.x, currentTarget.y, 0, currentTarget.x, currentTarget.y, 250);
-            grad.addColorStop(0, 'rgba(0,0,0,1)');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            mctx.fillStyle = grad;
-            mctx.beginPath(); mctx.arc(currentTarget.x, currentTarget.y, 250, 0, Math.PI * 2); mctx.fill();
-            ctx.drawImage(maskCanvas, 0, 0);
-            ctx.restore();
-            proximityZoomSize += 1.5;
-            ctx.save();
-            ctx.textAlign = "center"; ctx.font = `bold ${proximityZoomSize}px sans-serif`;
-            ctx.fillStyle = `rgba(255, 255, 255, 0.25)`;
-            ctx.fillText("DVD", width/2, height/2 + proximityZoomSize/3);
-            ctx.restore();
-        } else { proximityZoomSize = 40; }
+            grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+            mctx.fillStyle = grad; mctx.beginPath(); mctx.arc(currentTarget.x, currentTarget.y, 250, 0, Math.PI * 2); mctx.fill();
+            ctx.drawImage(maskCanvas, 0, 0); ctx.restore();
 
+            // ⑥ 心音タイポグラフィ
+            heartRate += 0.2;
+            let pulse = 1 + Math.sin(heartRate) * 0.1;
+            proximityZoomSize += 1.5;
+            ctx.save(); ctx.textAlign="center"; ctx.font=`bold ${proximityZoomSize * pulse}px sans-serif`; ctx.fillStyle=`rgba(255,255,255,${0.3 * pulse})`; ctx.fillText("CHANCE!", width/2, height/2); ctx.restore();
+        } else {
+            proximityZoomSize = 40;
+            heartRate = 0;
+        }
+
+        if (comboDisplayLife > 0 && comboCount > 1) {
+            comboDisplayLife--; ctx.save(); ctx.textAlign = "center"; ctx.font = `bold ${40 + comboCount*2}px sans-serif`;
+            ctx.fillStyle = varColor('--gold'); ctx.globalAlpha = comboDisplayLife / 60; ctx.fillText(`${comboCount} STREAK!`, width/2, height/2 - 100); ctx.restore();
+        }
+
+        // 爆発 ＆ ⑧ 衝撃波フィニッシュ
         explosions = explosions.filter(e => e.life > 0);
         explosions.forEach(e => { 
-            e.r += 12; e.life -= 0.04; ctx.strokeStyle = "#ff3e3e"; ctx.globalAlpha = e.life;
-            ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke(); 
+            if (e.isFinishWave) { e.r += 40; e.life -= 0.02; ctx.strokeStyle = `rgba(255,255,255,${e.life})`; ctx.lineWidth = 10; }
+            else { e.r += 12; e.life -= 0.04; ctx.strokeStyle = "#ff3e3e"; ctx.lineWidth = 4; }
+            ctx.globalAlpha = e.life; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke(); 
         });
 
         if (zoomEffect.active) {
-            zoomEffect.life--;
-            zoomEffect.size += width * 0.038; zoomEffect.hue += 15;
-            ctx.save();
-            ctx.globalAlpha = Math.min(1, zoomEffect.life / 20);
-            ctx.textAlign = "center";
-            ctx.font = `italic bold ${zoomEffect.size}px sans-serif`;
-            if (zoomEffect.isRainbow) {
-                ctx.fillStyle = `hsl(${zoomEffect.hue % 360}, 100%, 70%)`;
-                ctx.shadowBlur = 40; ctx.shadowColor = ctx.fillStyle;
-            } else { ctx.fillStyle = "#ffffff"; ctx.shadowBlur = 20; ctx.shadowColor = "#fff"; }
-            ctx.fillText(zoomEffect.text, width/2, height/2 + zoomEffect.size/3);
-            ctx.restore();
+            zoomEffect.life--; zoomEffect.size += width * 0.038; zoomEffect.hue += 15;
+            ctx.save(); ctx.globalAlpha = Math.min(1, zoomEffect.life / 20); ctx.textAlign = "center"; ctx.font = `italic bold ${zoomEffect.size}px 'Courier New'`;
+            if (zoomEffect.isRainbow) { ctx.fillStyle = `hsl(${zoomEffect.hue % 360}, 100%, 70%)`; ctx.shadowBlur = 40; ctx.shadowColor = ctx.fillStyle; }
+            else { ctx.fillStyle = "#ffffff"; ctx.shadowBlur = 20; ctx.shadowColor = "#fff"; }
+            ctx.fillText(zoomEffect.text, width/2, height/2 + zoomEffect.size/3); ctx.restore();
             if (zoomEffect.life <= 0) zoomEffect.active = false;
         }
+
+        // ⑩ パーティクル磁力吸着
+        particles.forEach(p => { 
+            if (p.isMagnet && pointer.x !== -1000) {
+                let dx = pointer.x - p.x, dy = pointer.y - p.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 300) { p.vx += dx/50; p.vy += dy/50; p.vx *= 0.95; p.vy *= 0.95; }
+            }
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); p.x += p.vx * timeDilation; p.y += p.vy * timeDilation; p.life -= 0.02; 
+        });
+        particles = particles.filter(p => p.life > 0);
+        
+        // ⑦ グリッチノイズ
+        if (glitchActive > 0) {
+            glitchActive--;
+            ctx.save(); ctx.globalAlpha = 0.3;
+            ctx.drawImage(canvas, Math.random()*20-10, 0);
+            ctx.restore();
+        }
+
+        scorePopups.forEach(s => { const isMinus = s.val < 0; ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; ctx.globalAlpha = s.life; ctx.font = `bold ${isMinus ? 32 : 30}px 'Courier New'`; ctx.textAlign = "center"; ctx.fillText((s.val > 0 ? "+" : "") + s.val, s.x, s.y); s.y -= 1.2; s.life -= 0.02; });
+        scorePopups = scorePopups.filter(s => s.life > 0);
 
         const ratio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN);
         ctx.save(); ctx.translate(pointer.rawX, pointer.rawY);
         const col = ratio === 1 ? "#00f2ff" : "#ff3e3e";
         ctx.strokeStyle = ratio === 1 ? "#00f2ff" : "#444"; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(0, 0, 18, -Math.PI/2, (-Math.PI/2)+(Math.PI*2*ratio)); ctx.stroke();
-        ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(12,0); ctx.moveTo(0,-12); ctx.lineTo(0,12); ctx.stroke();
-        ctx.restore();
+        ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(12,0); ctx.moveTo(0,-12); ctx.lineTo(0,12); ctx.stroke(); ctx.restore();
 
-        if (pointer.x !== -1000) {
-            ctx.strokeStyle = "#00f2ff"; ctx.globalAlpha = 0.4; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke();
-        }
-
-        particles.forEach(p => { 
-            ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); 
-            p.x += p.vx * timeDilation; p.y += p.vy * timeDilation; p.life -= 0.02; 
-        });
-        particles = particles.filter(p => p.life > 0);
+        if (pointer.x !== -1000) { ctx.strokeStyle = "#00f2ff"; ctx.globalAlpha = 0.4; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke(); }
         
-        scorePopups.forEach(s => { 
-            const isMinus = s.val < 0;
-            ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; ctx.globalAlpha = s.life; 
-            ctx.font = `bold ${isMinus ? 32 : 30}px sans-serif`; ctx.textAlign = "center";
-            ctx.fillText((s.val > 0 ? "+" : "") + s.val, s.x, s.y); s.y -= 1.2; s.life -= 0.02; 
-        });
-        scorePopups = scorePopups.filter(s => s.life > 0);
-
+        ctx.filter = 'none'; // フィルタ解除
         requestAnimationFrame(animate);
     }
 
+    function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     window.addEventListener('resize', () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; logos.forEach(l => l.updateSize()); });
     width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight;
     updateScoreUI();
