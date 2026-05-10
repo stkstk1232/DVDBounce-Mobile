@@ -70,7 +70,7 @@
 
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; background: white; z-index: 50; }
         .shake-heavy { animation: shake 0.4s ease-in-out; }
-        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-6px, 6px); } 75% { transform: translate(8px, -8px); } }
+        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-6px, 6px); } 75% { transform: translate(6px, -6px); } }
     </style>
 </head>
 <body>
@@ -81,15 +81,15 @@
 
 <div id="start-screen" class="overlay">
     <h1 style="font-size: 26px; color: var(--neon); letter-spacing: 4px; margin-bottom: 5px;">DVD PRO STRIKER</h1>
-    <p style="font-size: 10px; opacity: 0.5; margin-bottom: 20px;">v10.3 TRANSCENDENCE EDITION</p>
+    <p style="font-size: 10px; opacity: 0.5; margin-bottom: 20px;">v10.4 TRANSCENDENCE EDITION</p>
     
     <div class="manual">
         <strong style="color:var(--neon)">【遊び方・ルール】</strong><br>
-        ・<span style="color:var(--gold)">シールド操作:</span> 画面中央のエリア内で指またはマウスを動かしブロックを弾きます。<br>
-        ・<span style="color:var(--gold)">衝撃波:</span> 2本目の指タップ（PCは左クリック）で爆発を放ちます。<br>
-        ・<span style="color:var(--gold)">角ヒット(+10,000pt):</span> 高得点＋全画面衝撃波が発生します。<br>
-        ・<span style="color:var(--warn)">衝突リセット:</span> ブロック同士が当たると減点＋コンボが消えます。<br>
-        ・<span style="color:var(--gold)">カオスモード:</span> 残り10秒からユニットが激増。BGMも加速します。
+        ・<span style="color:var(--gold)">シールド操作:</span> エリア内で指やマウスを動かし弾き返します。<br>
+        ・<span style="color:var(--gold)">衝撃波:</span> 2本目のタップ（PCは左クリック）で爆発。<br>
+        ・<span style="color:var(--gold)">角ヒット(+10,000pt):</span> 高得点＋全画面衝撃波が発生。<br>
+        ・<span style="color:var(--warn)">衝突リセット:</span> 衝突すると減点＋コンボが消失します。<br>
+        ・<span style="color:var(--gold)">カオスモード:</span> 残り10秒から急増殖。BGMも加速。
     </div>
 
     <button class="btn" onclick="initGame('PC')">PC版で開始</button>
@@ -104,8 +104,8 @@
 
 <div id="ui-layer">
     <div class="hud-center">
-        <div id="best-display">BEST: 000000</div>
-        <div id="score-display">000000</div>
+        <div id="best-display">BEST: 0</div>
+        <div id="score-display">0</div>
         <div id="timer-display">60</div>
     </div>
 </div>
@@ -181,11 +181,24 @@
     }
 
     function triggerCombo(isCorner) { const now = Date.now(); if (now - lastHitTime < 3000) comboCount++; else comboCount = 1; lastHitTime = now; comboDisplayLife = 60; if (comboCount % 5 === 0) glitchActive = 15; }
-    function addScore(pts, x, y) { if (!gameActive) return; score += Math.floor(pts); scorePopups.push({x, y, val: Math.floor(pts), life: 1.0}); updateScoreUI(); }
-    function updateScoreUI() { const best = parseInt(localStorage.getItem('dvdBest_0') || 0); document.getElementById('score-display').innerText = score.toString().padStart(6, '0'); document.getElementById('best-display').innerText = "BEST: " + best.toString().padStart(6, '0'); }
+    
+    // スコア加算とUI更新（toLocaleStringを使用）
+    function addScore(pts, x, y) { 
+        if (!gameActive) return; 
+        score += Math.floor(pts); 
+        scorePopups.push({x, y, val: Math.floor(pts), life: 1.0}); 
+        updateScoreUI(); 
+    }
+    
+    function updateScoreUI() { 
+        const best = parseInt(localStorage.getItem('dvdBest_0') || 0); 
+        document.getElementById('score-display').innerText = score.toLocaleString(); 
+        document.getElementById('best-display').innerText = "BEST: " + best.toLocaleString(); 
+    }
+
     function triggerZoomEffect(text, durationSec, rainbow = true) { const f = durationSec * 60; timeDilation = 0.05; slowMoTimer = f; zoomEffect = {active:true, text, life:f, size:rainbow?20:width*0.05, hue:0, isRainbow:rainbow}; if (rainbow) { flash.style.opacity = '0.5'; setTimeout(()=>flash.style.opacity='0', 200); document.body.classList.add('shake-heavy'); setTimeout(()=>document.body.classList.remove('shake-heavy'), 400); } }
 
-    function initGame(mode) { platform = mode; document.getElementById('start-screen').style.display = 'none'; audio.play().catch(e => console.log("Audio play blocked")); startGame(); }
+    function initGame(mode) { platform = mode; document.getElementById('start-screen').style.display = 'none'; audio.play().catch(e => console.log("Audio play blocked")); updateScoreUI(); startGame(); }
 
     function startGame() { 
         gameActive = true; logos = [new DVDLogo()];
@@ -205,7 +218,9 @@
         let history = []; for(let i=0; i<5; i++) history.push(parseInt(localStorage.getItem('dvdBest_'+i) || 0));
         history.push(score); history.sort((a, b) => b - a); for(let i=0; i<5; i++) localStorage.setItem('dvdBest_'+i, history[i]);
         document.getElementById('result-screen').style.display = 'flex';
-        document.getElementById('ranking-content').innerHTML = history.map((s,i)=>`<div class="ranking-item" style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px dashed var(--text); ${s===score?'background:var(--neon); color:#000;':''}"><span>#0${i+1}</span><span>${s.toLocaleString()}</span></div>`).join('');
+        const content = document.getElementById('ranking-content');
+        // ランキング表示もカンマ区切りに修正
+        content.innerHTML = history.map((s,i)=>`<div class="ranking-item" style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px dashed var(--text); ${s===score?'background:var(--neon); color:#000;':''}"><span>#0${i+1}</span><span>${s.toLocaleString()}</span></div>`).join('');
     }
 
     function updatePointerPos(ix, iy) { pointer.rawX = ix; pointer.rawY = iy; const cx = width/2, cy = height/2, rx = width*0.35, ry = height*0.35, dx = ix-cx, dy = iy-cy; if ((dx**2/rx**2) + (dy**2/ry**2) <= 1) { pointer.x = ix; pointer.y = iy; } else { let a = Math.atan2(dy * rx, dx * ry); pointer.x = cx + rx * Math.cos(a); pointer.y = cy + ry * Math.sin(a); } }
@@ -224,28 +239,9 @@
         const curT = spotlightTarget; spotlightTarget = null;
         if (slowMoTimer > 0) { slowMoTimer--; timeDilation += (1.0 - timeDilation) * 0.12; } else { timeDilation = 1.0; }
         
-        // --- BGM演出制御 (修正版) ---
-        if (timeLeft <= 10 && timeLeft > 0) {
-            // カオスモードは常に加速
-            audio.playbackRate = 1.25;
-        } else {
-            // 通常時は等速
-            audio.playbackRate = 1.0;
-        }
-
-        if (slowMoTimer > 0) {
-            // ★角接近時：音量を0.6倍にし、「こもる」感じをシミュレート
-            audio.volume = 0.6;
-        } else {
-            // 通常およびラスト5秒：音量は最大
-            audio.volume = 1.0;
-        }
-
-        if (timeLeft <= 5 && timeLeft > 0) {
-            ctx.filter = 'grayscale(100%) brightness(1.2)';
-        } else {
-            ctx.filter = 'none';
-        }
+        if (timeLeft <= 10 && timeLeft > 0) { audio.playbackRate = 1.25; } else { audio.playbackRate = 1.0; }
+        if (slowMoTimer > 0) { audio.volume = 0.6; } else { audio.volume = 1.0; }
+        if (timeLeft <= 5 && timeLeft > 0) { ctx.filter = 'grayscale(100%) brightness(1.2)'; } else { ctx.filter = 'none'; }
 
         ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, width, height);
 
@@ -269,9 +265,21 @@
         if (zoomEffect.active) { zoomEffect.life--; zoomEffect.size += width * 0.038; zoomEffect.hue += 15; ctx.save(); ctx.globalAlpha = Math.min(1, zoomEffect.life / 20); ctx.textAlign = "center"; ctx.font = `italic bold ${zoomEffect.size}px 'Courier New'`; if (zoomEffect.isRainbow) { ctx.fillStyle = `hsl(${zoomEffect.hue % 360}, 100%, 70%)`; ctx.shadowBlur = 40; ctx.shadowColor = ctx.fillStyle; } else { ctx.fillStyle = "#ffffff"; ctx.shadowBlur = 20; ctx.shadowColor = "#fff"; } ctx.fillText(zoomEffect.text, width/2, height/2 + zoomEffect.size/3); ctx.restore(); if (zoomEffect.life <= 0) zoomEffect.active = false; }
         particles.forEach(p => { if (p.isMagnet && pointer.x !== -1000) { let dx = pointer.x - p.x, dy = pointer.y - p.y, dist = Math.sqrt(dx*dx + dy*dy); if (dist < 300) { p.vx += dx/50; p.vy += dy/50; p.vx *= 0.95; p.vy *= 0.95; } } ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); p.x += p.vx * timeDilation; p.y += p.vy * timeDilation; p.life -= 0.02; }); particles = particles.filter(p => p.life > 0);
         if (glitchActive > 0) { glitchActive--; ctx.save(); ctx.globalAlpha = 0.3; ctx.drawImage(canvas, Math.random()*20-10, 0); ctx.restore(); }
-        scorePopups.forEach(s => { const isMinus = s.val < 0; ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; ctx.globalAlpha = s.life; ctx.font = `bold ${isMinus ? 32 : 30}px 'Courier New'`; ctx.textAlign = "center"; ctx.fillText((s.val > 0 ? "+" : "") + s.val, s.x, s.y); s.y -= 1.2; s.life -= 0.02; }); scorePopups = scorePopups.filter(s => s.life > 0);
+        
+        // ポップアップもカンマ区切りに
+        scorePopups.forEach(s => { 
+            const isMinus = s.val < 0; 
+            ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; 
+            ctx.globalAlpha = s.life; ctx.font = `bold ${isMinus ? 32 : 30}px 'Courier New'`; 
+            ctx.textAlign = "center"; 
+            ctx.fillText((s.val > 0 ? "+" : "") + s.val.toLocaleString(), s.x, s.y); 
+            s.y -= 1.2; s.life -= 0.02; 
+        }); 
+        scorePopups = scorePopups.filter(s => s.life > 0);
+
         const ratio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN); ctx.save(); ctx.translate(pointer.rawX, pointer.rawY); const col = ratio === 1 ? "#00f2ff" : "#ff3e3e"; ctx.strokeStyle = ratio === 1 ? "#00f2ff" : "#444"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 18, -Math.PI/2, (-Math.PI/2)+(Math.PI*2*ratio)); ctx.stroke(); ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(12,0); ctx.moveTo(0,-12); ctx.lineTo(0,12); ctx.stroke(); ctx.restore();
         if (pointer.x !== -1000) { ctx.strokeStyle = "#00f2ff"; ctx.globalAlpha = 0.4; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke(); }
+        
         ctx.filter = 'none'; 
         requestAnimationFrame(animate);
     }
