@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DVD Pro Striker: Mobile Frenzy PB</title>
+    <style>
+        :root { --neon: #00f2ff; --warn: #ff3e3e; --gold: #ffd700; --frenzy: #ff0055; }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; 
+            background: #000; font-family: 'Arial Black', sans-serif; color: white;
+            touch-action: none; user-select: none; -webkit-user-select: none;
+        }
+        canvas { display: block; }
+
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .hud { position: absolute; padding: 15px; }
+        #score-display { top: 0; right: 10px; text-align: right; font-size: 24px; color: var(--neon); text-shadow: 0 0 10px var(--neon); }
+        #timer-display { top: 10px; left: 50%; transform: translateX(-50%); font-size: 40px; color: #fff; }
+        
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100; pointer-events: auto; text-align: center;
+        }
+        
+        .ranking-board {
+            width: 80%; max-width: 320px; background: rgba(255,255,255,0.05); border: 1px solid var(--neon);
+            border-radius: 10px; margin: 15px 0; padding: 10px; font-family: 'Courier New', monospace;
+        }
+        .ranking-item {
+            display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 16px; color: #aaa;
+        }
+        .ranking-item.latest { color: var(--neon); background: rgba(0, 242, 255, 0.15); font-weight: bold; }
+
+        .btn {
+            background: linear-gradient(45deg, var(--neon), #0062ff); color: white; border: none;
+            padding: 15px 40px; font-size: 20px; cursor: pointer; border-radius: 50px;
+            box-shadow: 0 0 20px var(--neon); font-weight: bold; margin: 10px;
+        }
+
+        #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; background: white; z-index: 50; }
+        .shake-heavy { animation: shake-h 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake-h { 10%, 90% { transform: translate3d(-4px, -4px, 0); } 20%, 80% { transform: translate3d(6px, 6px, 0); } 30%, 50%, 70% { transform: translate3d(-8px, -8px, 0); } }
+        .frenzy-active { animation: frenzy-glitch 0.2s infinite alternate; }
+        @keyframes frenzy-glitch { from { background: #000; box-shadow: inset 0 0 40px #300; } to { background: #0a0000; box-shadow: inset 0 0 80px #600; } }
+    </style>
+</head>
+<body id="body">
+
+<div id="flash"></div>
+
+<div id="start-screen" class="overlay">
+    <h1 style="font-size: 32px; color: var(--neon); text-shadow: 0 0 20px var(--neon); margin: 0;">DVD PRO STRIKER</h1>
+    <p style="color: var(--neon); font-size: 14px; margin-bottom: 20px;">MOBILE FRENZY PB</p>
+    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid var(--neon); font-size: 13px; text-align: left; width: 80%;">
+        <p>🔵 中央楕円内: シールドで弾く</p>
+        <p>🎯 楕円外タップ: 衝撃波(3s CD)</p>
+        <p>⚡ タッチ中: <span style="color:var(--frenzy)">超加速</span> / 離すと減速</p>
+        <p>🔥 ラスト10秒: 衝突減点なし＆増殖</p>
+    </div>
+    <button class="btn" onclick="startGame()">MISSION START</button>
+</div>
+
+<div id="result-screen" class="overlay" style="display:none;">
+    <h1 style="color: var(--gold); font-size: 32px; margin:0;">PERSONAL BESTS</h1>
+    <div class="ranking-board" id="ranking-content"></div>
+    <button class="btn" onclick="location.reload()">RETRY</button>
+</div>
+
+<div id="ui-layer">
+    <div id="score-display" class="hud">SCORE: 0<br><small id="best-display">BEST: 0</small></div>
+    <div id="timer-display" class="hud">60</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const body = document.getElementById('body');
+    const flash = document.getElementById('flash');
+    
+    let width, height;
+    let score = 0;
+    let timeLeft = 60;
+    let gameActive = false;
+    let logos = [];
+    let particles = [];
+    let scorePopups = [];
+    let explosions = [];
+    let isTouching = false;
+    
+    const BLAST_COOLDOWN = 3000;
+    let lastBlastTime = 0;
+
+    // タッチ・マウス共通座標
+    const pointer = { x: -1000, y: -1000, rawX: -1000, rawY: -1000, r: 70, mode: 'shield' };
+
+    class DVDLogo {
+        constructor() {
+            this.updateSize();
+            this.initPosition();
+            this.color = `hsl(${Math.random()*360}, 80%, 60%)`;
+            this.history = [];
+            this.stuckTimer = 0; 
+            this.lastX = this.x; this.lastY = this.y;
+        }
+        initPosition() {
+            this.x = Math.random() * (width - this.w);
+            this.y = Math.random() * (height - this.h);
+            this.vx = (Math.random() > 0.5 ? 4 : -4);
+            this.vy = (Math.random() > 0.5 ? 4 : -4);
+        }
+        updateSize() { 
+            this.w = width * 0.12; 
+            this.h = this.w * 0.5; 
+        }
+        update(dt) {
+            // モバイル仕様：タッチ中は加速、離すと減速
+            let speedMod = isTouching ? 2.8 : 0.6;
+            
+            this.history.push({x: this.x, y: this.y});
+            if(this.history.length > 6) this.history.shift();
+
+            const oldX = this.x, oldY = this.y;
+            this.x += this.vx * speedMod;
+            this.y += this.vy * speedMod;
+
+            // スタック防止
+            if (Math.abs(this.x - oldX) < 0.5 && Math.abs(this.y - oldY) < 0.5) {
+                this.stuckTimer += dt;
+                if (this.stuckTimer > 3000) this.initPosition();
+            } else { this.stuckTimer = 0; }
+
+            // シールド判定（pointer.x/yは楕円内に制限された座標）
+            let dx = (this.x + this.w/2) - pointer.x;
+            let dy = (this.y + this.h/2) - pointer.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < pointer.r + this.h/2) {
+                let angle = Math.atan2(dy, dx);
+                this.vx = Math.cos(angle) * 8; 
+                this.vy = Math.sin(angle) * 8;
+            }
+
+            // 衝撃波判定
+            explosions.forEach(exp => {
+                let edx = (this.x + this.w/2) - exp.x;
+                let edy = (this.y + this.h/2) - exp.y;
+                let edist = Math.sqrt(edx*edx + edy*edy);
+                if (edist < exp.r + 60) {
+                    let angle = Math.atan2(edy, edx);
+                    this.vx = Math.cos(angle) * 18; this.vy = Math.sin(angle) * 18;
+                }
+            });
+
+            // 壁判定
+            let hitW = false, hitH = false;
+            if (this.x <= 0 || this.x + this.w >= width) { 
+                this.vx *= -1; this.x = (this.x <= 0) ? 0 : width-this.w; hitW = true; 
+            }
+            if (this.y <= 0 || this.y + this.h >= height) { 
+                this.vy *= -1; this.y = (this.y <= 0) ? 0 : height-this.h; hitH = true; 
+            }
+
+            if (hitW && hitH) { 
+                addScore(10000, this.x + this.w/2, this.y + this.h/2); 
+                triggerSuperFlash(this.x + this.w/2, this.y + this.h/2); 
+                vibrate(100);
+            } else if (hitW || hitH) { 
+                addScore(100, this.x + this.w/2, this.y + this.h/2); 
+                vibrate(20);
+            }
+            if (hitW || hitH) this.color = `hsl(${Math.random()*360}, 80%, 60%)`;
+        }
+        draw() {
+            this.history.forEach((h, i) => { 
+                ctx.globalAlpha = i / 20; ctx.fillStyle = this.color; 
+                ctx.fillRect(h.x, h.y, this.w, this.h); 
+            });
+            ctx.globalAlpha = 1; ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.shadowBlur = 0; ctx.fillStyle = "#000"; ctx.font = `bold ${this.w*0.25}px Arial`; 
+            ctx.textAlign = "center"; ctx.fillText("DVD", this.x + this.w/2, this.y + this.h*0.7);
+        }
+    }
+
+    function addScore(pts, x, y) {
+        if (!gameActive) return;
+        score += pts;
+        scorePopups.push({x, y, val: pts, life: 1.0});
+        updateScoreUI();
+    }
+
+    function updateScoreUI() {
+        const best = parseInt(localStorage.getItem('dvdBest_0') || 0);
+        document.getElementById('score-display').innerHTML = `SCORE: ${score.toLocaleString()}<br><small>BEST: ${best.toLocaleString()}</small>`;
+    }
+
+    function triggerSuperFlash(x, y) {
+        flash.style.opacity = '0.6'; setTimeout(() => flash.style.opacity = '0', 150);
+        body.classList.add('shake-heavy'); setTimeout(() => body.classList.remove('shake-heavy'), 400);
+        for(let i=0; i<30; i++) particles.push({x, y, vx:(Math.random()-0.5)*15, vy:(Math.random()-0.5)*15, life:1.0, color:'#ffd700'});
+    }
+
+    function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+    function startGame() { 
+        document.getElementById('start-screen').style.display = 'none'; 
+        gameActive = true; 
+        score = 0; timeLeft = 60;
+        updateScoreUI();
+        const timer = setInterval(() => {
+            if (!gameActive) { clearInterval(timer); return; }
+            timeLeft--; 
+            document.getElementById('timer-display').innerText = timeLeft;
+            if (timeLeft <= 10) {
+                body.classList.add('frenzy-active');
+                if (timeLeft % 2 === 0) { for(let i=0; i<3; i++) logos.push(new DVDLogo()); }
+            }
+            if (timeLeft <= 0) { gameActive = false; showResult(); }
+        }, 1000);
+    }
+
+    function showResult() {
+        body.classList.remove('frenzy-active');
+        let history = [];
+        for(let i=0; i<5; i++) {
+            let s = parseInt(localStorage.getItem('dvdBest_'+i) || 0);
+            if(s > 0) history.push(s);
+        }
+        history.push(score);
+        history.sort((a, b) => b - a);
+        history = history.slice(0, 5);
+        for(let i=0; i<history.length; i++) localStorage.setItem('dvdBest_'+i, history[i]);
+
+        const content = document.getElementById('ranking-content');
+        content.innerHTML = '<div style="font-size:11px; margin-bottom:10px; opacity:0.6;">LOCAL TOP 5</div>';
+        history.forEach((s, index) => {
+            let isCurrent = (s === score);
+            content.innerHTML += `<div class="ranking-item ${isCurrent?'latest':''}"><span>${index + 1}位</span><span>${s.toLocaleString()} PT</span></div>`;
+        });
+        document.getElementById('result-screen').style.display = 'flex';
+    }
+
+    // モバイルタッチ入力
+    function handleInput(e) {
+        if (!gameActive) return;
+        e.preventDefault();
+        isTouching = true;
+        const t = e.touches ? e.touches[0] : e;
+        pointer.rawX = t.clientX;
+        pointer.rawY = t.clientY;
+
+        // 楕円エリア計算
+        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
+        const dx = pointer.rawX - centerX, dy = pointer.rawY - centerY;
+        
+        if ((dx**2/rx**2) + (dy**2/ry**2) <= 1) {
+            pointer.x = pointer.rawX; pointer.y = pointer.rawY;
+            pointer.mode = 'shield';
+        } else {
+            // 楕円の縁にシールドを固定
+            let angle = Math.atan2(dy * rx, dx * ry);
+            pointer.x = centerX + rx * Math.cos(angle);
+            pointer.y = centerY + ry * Math.sin(angle);
+            pointer.mode = 'target';
+        }
+    }
+
+    // 衝撃波（楕円外タップ時のみ）
+    function handleTap(e) {
+        if (!gameActive) return;
+        const t = e.changedTouches ? e.changedTouches[0] : e;
+        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
+        const dx = t.clientX - centerX, dy = t.clientY - centerY;
+        
+        if ((dx**2/rx**2) + (dy**2/ry**2) > 1) {
+            const now = Date.now();
+            if (now - lastBlastTime > BLAST_COOLDOWN) {
+                lastBlastTime = now;
+                explosions.push({x: t.clientX, y: t.clientY, r: 0, life: 1.0});
+                vibrate(50);
+            }
+        }
+    }
+
+    let lastTime = performance.now();
+    function animate(time) {
+        const dt = time - lastTime; lastTime = time;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; ctx.fillRect(0, 0, width, height);
+        
+        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
+        
+        // 背景の楕円ガイド
+        ctx.strokeStyle = 'rgba(0, 242, 255, 0.1)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(centerX, centerY, rx, ry, 0, 0, Math.PI*2); ctx.stroke();
+
+        if (gameActive) {
+            // 衝突判定
+            if (timeLeft > 10) {
+                for (let i = 0; i < logos.length; i++) {
+                    for (let j = i + 1; j < logos.length; j++) {
+                        let a = logos[i], b = logos[j];
+                        if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
+                            addScore(-100, a.x + a.w/2, a.y + a.h/2);
+                            let angle = Math.atan2(b.y - a.y, b.x - a.x);
+                            a.vx -= Math.cos(angle) * 3; a.vy -= Math.sin(angle) * 3;
+                            b.vx += Math.cos(angle) * 3; b.vy += Math.sin(angle) * 3;
+                        }
+                    }
+                }
+            }
+            logos.forEach(l => { l.update(dt); l.draw(); });
+        }
+
+        // 衝撃波エフェクト
+        explosions = explosions.filter(e => e.life > 0);
+        explosions.forEach(e => { 
+            e.r += 10; e.life -= 0.03; 
+            ctx.strokeStyle = `rgba(255, 62, 62, ${e.life})`; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke(); 
+        });
+
+        // 照準とシールドUI
+        if (isTouching) {
+            if (pointer.mode === 'shield') {
+                ctx.strokeStyle = varColor('--neon'); ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+            }
+            // クールダウンゲージ
+            const blastRatio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN);
+            ctx.save(); ctx.translate(pointer.rawX, pointer.rawY);
+            ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 3; ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.strokeStyle = blastRatio === 1 ? varColor('--gold') : varColor('--warn');
+            ctx.arc(0, 0, 25, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*blastRatio)); ctx.stroke();
+            ctx.restore();
+        }
+
+        // パーティクル・ポップアップ
+        particles = particles.filter(p => p.life > 0);
+        particles.forEach(p => { 
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life; 
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill(); 
+            p.x += p.vx; p.y += p.vy; p.life -= 0.02; 
+        });
+        scorePopups = scorePopups.filter(s => s.life > 0);
+        scorePopups.forEach(s => { 
+            ctx.fillStyle = s.val > 0 ? (s.val >= 1000 ? varColor('--gold') : "#0f0") : varColor('--warn'); 
+            ctx.globalAlpha = s.life; ctx.font = "bold 20px Arial"; 
+            ctx.fillText((s.val>0?"+":"")+s.val.toLocaleString(), s.x, s.y); 
+            s.y -= 1; s.life -= 0.02; 
+        });
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(animate);
+    }
+
+    function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+    window.addEventListener('resize', () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; logos.forEach(l => l.updateSize()); });
+    canvas.addEventListener('touchstart', handleInput);
+    canvas.addEventListener('touchmove', handleInput);
+    canvas.addEventListener('touchend', (e) => { isTouching = false; handleTap(e); pointer.x = pointer.y = -1000; });
+
+    // 初期化
+    width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight;
+    for(let i=0; i<3; i++) logos.push(new DVDLogo());
+    updateScoreUI();
+    requestAnimationFrame(animate);
+</script>
+</body>
+</html>
