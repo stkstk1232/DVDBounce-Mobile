@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DVD Pro Striker: Transcendence Final</title>
+    <title>DVD Pro Striker: Transcendence Audio-Sync</title>
     <style>
         :root {
             --neon: #00f2ff;
@@ -24,18 +24,29 @@
         canvas { display: block; cursor: none; }
 
         #ui-layer { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center;
+            position: absolute; top: 0; left: 0; width: 100%; 
+            pointer-events: none; z-index: 10; 
+            display: flex; justify-content: center;
         }
         
         .hud-center {
-            margin-top: 15px; text-align: center; background: var(--panel);
-            padding: 10px 30px; border: 1px solid var(--grid); border-top: none;
-            border-radius: 0 0 20px 20px; backdrop-filter: blur(5px);
+            margin-top: 10px; text-align: center; 
+            padding: 5px 20px; 
+            background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+            border-radius: 10px;
+            display: flex; gap: 20px; align-items: baseline;
         }
-        #score-display { font-size: 32px; color: var(--neon); letter-spacing: 2px; font-weight: bold; }
-        #best-display { font-size: 11px; opacity: 0.6; }
-        #timer-display { font-size: 40px; font-weight: bold; margin-top: 5px; }
+
+        #score-display { font-size: 24px; color: var(--neon); letter-spacing: 2px; font-weight: bold; text-shadow: 0 0 10px var(--neon); }
+        #best-display { font-size: 10px; opacity: 0.8; color: var(--gold); }
+        #timer-display { font-size: 28px; font-weight: bold; color: var(--text); min-width: 40px; }
+
+        @media (max-width: 768px) {
+            .hud-center { gap: 12px; padding: 5px 15px; margin-top: 5px; border: none; background: none; }
+            #score-display { font-size: 20px; }
+            #timer-display { font-size: 22px; }
+            #best-display { font-size: 9px; }
+        }
 
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -59,25 +70,25 @@
 
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; background: white; z-index: 50; }
         .shake-heavy { animation: shake 0.4s ease-in-out; }
-        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-6px, 6px); } 75% { transform: translate(6px, -8px); } }
+        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-6px, 6px); } 75% { transform: translate(8px, -8px); } }
     </style>
 </head>
 <body>
+
+<!-- ★BGMタグの追加 -->
+<audio id="bgm-player" src="bgm.mp3" loop preload="auto"></audio>
 
 <div id="flash"></div>
 
 <div id="start-screen" class="overlay">
     <h1 style="font-size: 24px; color: var(--neon); letter-spacing: 3px; margin-bottom: 5px;">DVD PRO STRIKER</h1>
-    <p style="font-size: 10px; opacity: 0.6; margin-bottom: 15px;">v10.0 FINAL TRANSCENDENCE</p>
+    <p style="font-size: 10px; opacity: 0.6; margin-bottom: 15px;">v11.0 TRANSCENDENCE AUDIO-SYNC</p>
     
     <div class="manual">
-        <strong style="color:var(--gold)">【カオスモード：残り10秒】</strong><br>
-        ・<span style="color:var(--gold)">2秒ごとに3基増殖</span> (絶対維持)<br>
-        ・ラスト5秒：ネオン・ドレイン(モノクロ)<br><br>
-        <strong style="color:var(--neon)">【能汁システム】</strong><br>
-        ・角ヒット：虹色ズーム & 全画面衝撃波 & 磁力<br>
-        ・角接近：スロー & スポットライト & 心音演出<br>
-        ・コンボ：倍率UP & グリッチノイズ
+        <strong style="color:var(--gold)">【能汁：BGMシンクロ】</strong><br>
+        ・角接近：音がこもり、スロー再生へ<br>
+        ・カオスモード：BGMが1.2倍速へ加速！<br>
+        ・ラスト5秒：音が消えていき、無の世界へ…
     </div>
 
     <button class="btn" onclick="initGame('PC')">PC TERMINAL</button>
@@ -104,6 +115,7 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const flash = document.getElementById('flash');
+    const audio = document.getElementById('bgm-player'); // ★JSでAudioを取得
     
     let width, height, score = 0, timeLeft = 60, platform = 'PC';
     let gameActive = false, isTouching = false;
@@ -114,10 +126,7 @@
     let zoomEffect = { active: false, text: "DVD", life: 0, size: 0, hue: 0, isRainbow: true };
     let chaosFlash = 0, spotlightTarget = null, proximityZoomSize = 40;
     let warpOffset = 0, gridDistortion = 0;
-
-    // --- 追加演出管理用変数 (6-10) ---
-    let heartRate = 0;      // ⑥心音
-    let glitchActive = 0;   // ⑦グリッチ
+    let heartRate = 0, glitchActive = 0;   
 
     let isSpacePressed = false, isShiftPressed = false;
     const BLAST_COOLDOWN = 3000;
@@ -145,153 +154,67 @@
             this.y += this.vy * speedMod * timeDilation;
             this.history.unshift({x: this.x, y: this.y});
             if(this.history.length > 8) this.history.pop();
-
             this.checkProximityToCorner();
-
-            let dx = (this.x + this.w/2) - pointer.x;
-            let dy = (this.y + this.h/2) - pointer.y;
-            if (Math.sqrt(dx*dx + dy*dy) < pointer.r + this.h/2) {
-                let angle = Math.atan2(dy, dx);
-                this.vx = Math.cos(angle) * 8.5; this.vy = Math.sin(angle) * 8.5;
-            }
-
-            explosions.forEach(exp => {
-                let edx = (this.x + this.w/2) - exp.x;
-                let edy = (this.y + this.h/2) - exp.y;
-                if (Math.sqrt(edx*edx + edy*edy) < exp.r + 65) {
-                    let angle = Math.atan2(edy, edx);
-                    this.vx = Math.cos(angle) * 16; this.vy = Math.sin(angle) * 16;
-                }
-            });
-
+            let dx = (this.x + this.w/2) - pointer.x, dy = (this.y + this.h/2) - pointer.y;
+            if (Math.sqrt(dx*dx + dy*dy) < pointer.r + this.h/2) { let angle = Math.atan2(dy, dx); this.vx = Math.cos(angle) * 8.5; this.vy = Math.sin(angle) * 8.5; }
+            explosions.forEach(exp => { let edx = (this.x + this.w/2) - exp.x, edy = (this.y + this.h/2) - exp.y; if (Math.sqrt(edx*edx + edy*edy) < exp.r + 65) { let angle = Math.atan2(edy, edx); this.vx = Math.cos(angle) * 16; this.vy = Math.sin(angle) * 16; } });
             let hitW = false, hitH = false;
             if (this.x <= 0 || this.x + this.w >= width) { this.vx *= -1; this.x = (this.x <= 0) ? 0 : width-this.w; hitW = true; }
             if (this.y <= 0 || this.y + this.h >= height) { this.vy *= -1; this.y = (this.y <= 0) ? 0 : height-this.h; hitH = true; }
-
             if (hitW && hitH) { 
-                triggerCombo(true);
-                addScore(10000 * (1 + comboCount * 0.1), this.x + this.w/2, this.y + this.h/2); 
-                triggerZoomEffect("DVD", 0.7, true); 
+                triggerCombo(true); addScore(10000 * (1 + comboCount * 0.1), this.x + this.w/2, this.y + this.h/2); triggerZoomEffect("DVD", 0.7, true); 
                 gridDistortion = 50; spotlightTarget = null;
-
-                // ⑧ 衝撃波フィニッシュ & ⑩ パーティクル生成
                 explosions.push({x: this.x + this.w/2, y: this.y + this.h/2, r: 0, life: 1.0, isFinishWave: true});
                 for(let i=0; i<30; i++) particles.push({x: this.x+this.w/2, y: this.y+this.h/2, vx:(Math.random()-0.5)*20, vy:(Math.random()-0.5)*20, life:1.0, color:varColor('--gold'), isMagnet: true});
-
-            } else if (hitW || hitH) { 
-                triggerCombo(false);
-                addScore(100 * (1 + comboCount * 0.1), this.x + this.w/2, this.y + this.h/2); 
-            }
+            } else if (hitW || hitH) { triggerCombo(false); addScore(100 * (1 + comboCount * 0.1), this.x + this.w/2, this.y + this.h/2); }
             if (hitW || hitH) this.color = `hsl(${Math.random()*360}, 75%, 60%)`;
         }
-
         checkProximityToCorner() {
-            const margin = 80; 
-            const nearLeft = this.x < margin, nearRight = this.x + this.w > width - margin;
-            const nearTop = this.y < margin, nearBottom = this.y + this.h > height - margin;
-            if ((nearLeft || nearRight) && (nearTop || nearBottom)) {
-                if (timeDilation > 0.1) { timeDilation = 0.1; slowMoTimer = 15; spotlightTarget = { x: this.x + this.w/2, y: this.y + this.h/2 }; }
-            }
+            const margin = 80; if ((this.x < margin || this.x + this.w > width - margin) && (this.y < margin || this.y + this.h > height - margin)) { if (timeDilation > 0.1) { timeDilation = 0.1; slowMoTimer = 15; spotlightTarget = { x: this.x + this.w/2, y: this.y + this.h/2 }; } }
         }
-
         draw() {
-            this.rainbowHue += 5;
-            this.history.forEach((h, i) => {
-                ctx.globalAlpha = (1 - i/8) * 0.2;
-                ctx.fillStyle = (timeLeft <= 10) ? `hsl(${(this.rainbowHue-i*10)%360}, 100%, 70%)` : this.color;
-                ctx.fillRect(h.x, h.y, this.w, this.h);
-            });
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = "#0a0a0a"; ctx.fillRect(this.x, this.y, this.w, this.h);
-            ctx.strokeStyle = (timeLeft <= 10) ? `hsl(${this.rainbowHue%360}, 100%, 70%)` : this.color;
-            ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
-            ctx.fillStyle = ctx.strokeStyle; ctx.font = `bold ${this.w*0.3}px sans-serif`; ctx.textAlign = "center";
-            ctx.fillText("DVD", this.x + this.w/2, this.y + this.h*0.68);
+            this.rainbowHue += 5; ctx.globalAlpha = 1; ctx.fillStyle = "#0a0a0a"; ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.strokeStyle = (timeLeft <= 10) ? `hsl(${this.rainbowHue%360}, 100%, 70%)` : this.color; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+            ctx.fillStyle = ctx.strokeStyle; ctx.font = `bold ${this.w*0.3}px sans-serif`; ctx.textAlign = "center"; ctx.fillText("DVD", this.x + this.w/2, this.y + this.h*0.68);
         }
     }
 
-    function triggerCombo(isCorner) {
-        const now = Date.now();
-        if (now - lastHitTime < 3000) comboCount++; else comboCount = 1;
-        lastHitTime = now; comboDisplayLife = 60;
-        // ⑦ コンボランクに応じたグリッチ
-        if (comboCount % 5 === 0) glitchActive = 15;
-    }
+    function triggerCombo(isCorner) { const now = Date.now(); if (now - lastHitTime < 3000) comboCount++; else comboCount = 1; lastHitTime = now; comboDisplayLife = 60; if (comboCount % 5 === 0) glitchActive = 15; }
+    function addScore(pts, x, y) { if (!gameActive) return; score += Math.floor(pts); scorePopups.push({x, y, val: Math.floor(pts), life: 1.0}); updateScoreUI(); }
+    function updateScoreUI() { const best = parseInt(localStorage.getItem('dvdBest_0') || 0); document.getElementById('score-display').innerText = score.toString().padStart(6, '0'); document.getElementById('best-display').innerText = "BEST: " + best.toString().padStart(6, '0'); }
+    function triggerZoomEffect(text, durationSec, rainbow = true) { const f = durationSec * 60; timeDilation = 0.05; slowMoTimer = f; zoomEffect = {active:true, text, life:f, size:rainbow?20:width*0.05, hue:0, isRainbow:rainbow}; if (rainbow) { flash.style.opacity = '0.5'; setTimeout(()=>flash.style.opacity='0', 200); document.body.classList.add('shake-heavy'); setTimeout(()=>document.body.classList.remove('shake-heavy'), 400); } }
 
-    function addScore(pts, x, y) {
-        if (!gameActive) return;
-        score += Math.floor(pts);
-        scorePopups.push({x, y, val: Math.floor(pts), life: 1.0});
-        updateScoreUI();
+    // ★initGameの中で再生を開始
+    function initGame(mode) { 
+        platform = mode; 
+        document.getElementById('start-screen').style.display = 'none'; 
+        audio.play().catch(e => console.log("Audio play blocked")); // エラー防止
+        startGame(); 
     }
-
-    function updateScoreUI() {
-        const best = parseInt(localStorage.getItem('dvdBest_0') || 0);
-        document.getElementById('score-display').innerText = score.toString().padStart(6, '0');
-        document.getElementById('best-display').innerText = "BEST: " + best.toString().padStart(6, '0');
-    }
-
-    function triggerZoomEffect(text, durationSec, rainbow = true) {
-        const frameCount = durationSec * 60;
-        timeDilation = 0.05; slowMoTimer = frameCount; 
-        zoomEffect.active = true; zoomEffect.text = text; zoomEffect.life = frameCount;
-        zoomEffect.size = rainbow ? 20 : width * 0.05; zoomEffect.hue = 0; zoomEffect.isRainbow = rainbow;
-        if (rainbow) {
-            flash.style.opacity = '0.5'; setTimeout(() => flash.style.opacity = '0', 200);
-            document.body.classList.add('shake-heavy'); setTimeout(() => document.body.classList.remove('shake-heavy'), 400);
-        }
-    }
-
-    function initGame(mode) { platform = mode; document.getElementById('start-screen').style.display = 'none'; startGame(); }
 
     function startGame() { 
-        gameActive = true; 
-        logos = [new DVDLogo()];
+        gameActive = true; logos = [new DVDLogo()];
         const timer = setInterval(() => {
             if (!gameActive) { clearInterval(timer); return; }
             if (timeDilation > 0.4) {
-                timeLeft--; 
-                document.getElementById('timer-display').innerText = timeLeft;
-                if (timeLeft === 45) logos.push(new DVDLogo()); 
-                if (timeLeft === 30) logos.push(new DVDLogo()); 
-                
-                if (timeLeft <= 10 && timeLeft > 0) {
-                    triggerZoomEffect(timeLeft.toString(), 0.5, false); 
-                    if (timeLeft % 2 === 0) {
-                        for(let i=0; i<3; i++) logos.push(new DVDLogo());
-                    }
-                }
+                timeLeft--; document.getElementById('timer-display').innerText = timeLeft;
+                if (timeLeft === 45 || timeLeft === 30) logos.push(new DVDLogo()); 
+                if (timeLeft <= 10 && timeLeft > 0) { triggerZoomEffect(timeLeft.toString(), 0.5, false); if (timeLeft % 2 === 0) { for(let i=0; i<3; i++) logos.push(new DVDLogo()); } }
             }
-            if (timeLeft <= 0) { gameActive = false; showResult(); }
+            if (timeLeft <= 0) { gameActive = false; audio.pause(); showResult(); }
         }, 1000);
         requestAnimationFrame(animate);
     }
 
     function showResult() {
-        let history = [];
-        for(let i=0; i<5; i++) history.push(parseInt(localStorage.getItem('dvdBest_'+i) || 0));
-        history.push(score); history.sort((a, b) => b - a);
-        for(let i=0; i<5; i++) localStorage.setItem('dvdBest_'+i, history[i]);
+        let history = []; for(let i=0; i<5; i++) history.push(parseInt(localStorage.getItem('dvdBest_'+i) || 0));
+        history.push(score); history.sort((a, b) => b - a); for(let i=0; i<5; i++) localStorage.setItem('dvdBest_'+i, history[i]);
         document.getElementById('result-screen').style.display = 'flex';
-        const content = document.getElementById('ranking-content');
-        content.innerHTML = history.map((s,i)=>`<div class="ranking-item" style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px dashed var(--text); ${s===score?'background:var(--neon); color:#000;':''}"><span>#0${i+1}</span><span>${s.toLocaleString()}</span></div>`).join('');
+        document.getElementById('ranking-content').innerHTML = history.map((s,i)=>`<div class="ranking-item" style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px dashed var(--text); ${s===score?'background:var(--neon); color:#000;':''}"><span>#0${i+1}</span><span>${s.toLocaleString()}</span></div>`).join('');
     }
 
-    function updatePointerPos(inputX, inputY) {
-        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
-        const dx = inputX - centerX, dy = inputY - centerY;
-        pointer.rawX = inputX; pointer.rawY = inputY;
-        if ((dx**2/rx**2) + (dy**2/ry**2) <= 1) { pointer.x = inputX; pointer.y = inputY; }
-        else { let angle = Math.atan2(dy * rx, dx * ry); pointer.x = centerX + rx * Math.cos(angle); pointer.y = centerY + ry * Math.sin(angle); }
-    }
-
-    function triggerBlast(x, y, force = false) {
-        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
-        if (force || ((x-centerX)**2/rx**2) + ((y-centerY)**2/ry**2) > 1) {
-            const now = Date.now();
-            if (now - lastBlastTime > BLAST_COOLDOWN) { lastBlastTime = now; explosions.push({x, y, r: 0, life: 1.0}); if (platform === 'MOBILE') navigator.vibrate(30); }
-        }
-    }
+    function updatePointerPos(ix, iy) { pointer.rawX = ix; pointer.rawY = iy; const cx = width/2, cy = height/2, rx = width*0.35, ry = height*0.35, dx = ix-cx, dy = iy-cy; if ((dx**2/rx**2) + (dy**2/ry**2) <= 1) { pointer.x = ix; pointer.y = iy; } else { let a = Math.atan2(dy * rx, dx * ry); pointer.x = cx + rx * Math.cos(a); pointer.y = cy + ry * Math.sin(a); } }
+    function triggerBlast(x, y, f = false) { if (f || ((x-width/2)**2/(width*0.35)**2 + (y-height/2)**2/(height*0.35)**2 > 1)) { const now = Date.now(); if (now - lastBlastTime > BLAST_COOLDOWN) { lastBlastTime = now; explosions.push({x, y, r: 0, life: 1.0}); if (platform === 'MOBILE') navigator.vibrate(30); } } }
 
     window.addEventListener('mousemove', e => { if (platform === 'PC') updatePointerPos(e.clientX, e.clientY); });
     window.addEventListener('mousedown', e => { if (platform === 'PC') triggerBlast(e.clientX, e.clientY); });
@@ -303,119 +226,48 @@
 
     function animate() {
         if (!gameActive) return;
-        const currentTarget = spotlightTarget; spotlightTarget = null;
+        const curT = spotlightTarget; spotlightTarget = null;
         if (slowMoTimer > 0) { slowMoTimer--; timeDilation += (1.0 - timeDilation) * 0.12; } else { timeDilation = 1.0; }
         
-        // ⑨ ネオン・ドレイン（ラスト5秒モノクロ）
-        if (timeLeft <= 5) ctx.filter = 'grayscale(100%) brightness(1.2)';
-        else ctx.filter = 'none';
+        // ★BGM演出制御
+        // 1. スロー/加速シンクロ
+        if (slowMoTimer > 0) audio.playbackRate = 0.75; // スロー
+        else if (timeLeft <= 10 && timeLeft > 0) audio.playbackRate = 1.25; // 加速
+        else audio.playbackRate = 1.0;
+
+        // 2. ⑨ ネオン・ドレイン（ラスト5秒モノクロ & 音量低下）
+        if (timeLeft <= 5 && timeLeft > 0) {
+            ctx.filter = 'grayscale(100%) brightness(1.2)';
+            audio.volume = Math.max(0, timeLeft / 5);
+        } else {
+            ctx.filter = 'none'; audio.volume = 1.0;
+        }
 
         ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, width, height);
-
-        // 背景描画
-        warpOffset += (timeLeft <= 10) ? 20 : 1; gridDistortion *= 0.9;
-        ctx.save(); ctx.strokeStyle = (timeLeft <= 10) ? "rgba(255,255,255,0.3)" : "rgba(0, 242, 255, 0.1)";
+        warpOffset += (timeLeft <= 10) ? 20 : 1; gridDistortion *= 0.92;
+        ctx.save(); ctx.strokeStyle = (timeLeft <= 10) ? "rgba(255,255,255,0.3)" : "rgba(0, 242, 255, 0.1)"; ctx.lineWidth = 1;
         for(let x=-100; x<width+100; x+=50) { ctx.beginPath(); for(let y=0; y<height; y+=10) ctx.lineTo(x + Math.sin((y + warpOffset)/50)*gridDistortion, y); ctx.stroke(); }
         for(let y=-100; y<height+100; y+=50) { ctx.beginPath(); for(let x=0; x<width; x+=10) ctx.lineTo(x, y + Math.cos((x + warpOffset)/50)*gridDistortion + (timeLeft <= 10 ? (warpOffset % 50) : 0)); ctx.stroke(); }
         ctx.restore();
-
-        const centerX = width/2, centerY = height/2, rx = width*0.35, ry = height*0.35;
-        ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.beginPath(); ctx.ellipse(centerX, centerY, rx, ry, 0, 0, Math.PI*2); ctx.stroke();
-
+        ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.beginPath(); ctx.ellipse(width/2, height/2, width*0.35, height*0.35, 0, 0, Math.PI*2); ctx.stroke();
         if (timeLeft <= 10 && Math.sin(Date.now()/50) > 0) { ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.lineWidth = 15; ctx.strokeRect(0, 0, width, height); }
-
-        if (timeLeft > 10) {
-            for (let i = 0; i < logos.length; i++) {
-                for (let j = i + 1; j < logos.length; j++) {
-                    let a = logos[i], b = logos[j];
-                    if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
-                        addScore(-100, a.x + a.w/2, a.y + a.h/2); comboCount = 0; comboDisplayLife = 0;
-                        let ang = Math.atan2(b.y - a.y, b.x - a.x);
-                        a.vx -= Math.cos(ang) * 3.5; a.vy -= Math.sin(ang) * 3.5;
-                        b.vx += Math.cos(ang) * 3.5; b.vy += Math.sin(ang) * 3.5;
-                    }
-                }
-            }
-        }
-
+        if (timeLeft > 10) { for (let i=0; i<logos.length; i++) for (let j=i+1; j<logos.length; j++) { let a=logos[i], b=logos[j]; if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) { addScore(-100, a.x + a.w/2, a.y + a.h/2); comboCount = 0; comboDisplayLife = 0; let ang = Math.atan2(b.y - a.y, b.x - a.x); a.vx -= Math.cos(ang) * 3.5; a.vy -= Math.sin(ang) * 3.5; b.vx += Math.cos(ang) * 3.5; b.vy += Math.sin(ang) * 3.5; } } }
         logos.forEach(l => { l.update(16); l.draw(); });
 
-        // スポットライト演出 & ⑥ 心音
-        if (currentTarget && !zoomEffect.active) {
-            ctx.save();
-            const maskCanvas = document.createElement('canvas'); maskCanvas.width = width; maskCanvas.height = height;
-            const mctx = maskCanvas.getContext('2d'); mctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; mctx.fillRect(0, 0, width, height);
-            mctx.globalCompositeOperation = 'destination-out';
-            const grad = mctx.createRadialGradient(currentTarget.x, currentTarget.y, 0, currentTarget.x, currentTarget.y, 250);
-            grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
-            mctx.fillStyle = grad; mctx.beginPath(); mctx.arc(currentTarget.x, currentTarget.y, 250, 0, Math.PI * 2); mctx.fill();
-            ctx.drawImage(maskCanvas, 0, 0); ctx.restore();
+        if (curT && !zoomEffect.active) {
+            ctx.save(); const mC = document.createElement('canvas'); mC.width = width; mC.height = height; const mctx = mC.getContext('2d'); mctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; mctx.fillRect(0, 0, width, height); mctx.globalCompositeOperation = 'destination-out'; const grad = mctx.createRadialGradient(curT.x, curT.y, 0, curT.x, curT.y, 250); grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)'); mctx.fillStyle = grad; mctx.beginPath(); mctx.arc(curT.x, curT.y, 250, 0, Math.PI * 2); mctx.fill(); ctx.drawImage(mC, 0, 0); ctx.restore();
+            heartRate += 0.2; let pulse = 1 + Math.sin(heartRate) * 0.1; proximityZoomSize += 1.5; ctx.save(); ctx.textAlign="center"; ctx.font=`bold ${proximityZoomSize * pulse}px sans-serif`; ctx.fillStyle=`rgba(255,255,255,${0.3 * pulse})`; ctx.fillText("CHANCE!", width/2, height/2); ctx.restore();
+        } else { proximityZoomSize = 40; heartRate = 0; }
 
-            // ⑥ 心音タイポグラフィ
-            heartRate += 0.2;
-            let pulse = 1 + Math.sin(heartRate) * 0.1;
-            proximityZoomSize += 1.5;
-            ctx.save(); ctx.textAlign="center"; ctx.font=`bold ${proximityZoomSize * pulse}px sans-serif`; ctx.fillStyle=`rgba(255,255,255,${0.3 * pulse})`; ctx.fillText("CHANCE!", width/2, height/2); ctx.restore();
-        } else {
-            proximityZoomSize = 40;
-            heartRate = 0;
-        }
-
-        if (comboDisplayLife > 0 && comboCount > 1) {
-            comboDisplayLife--; ctx.save(); ctx.textAlign = "center"; ctx.font = `bold ${40 + comboCount*2}px sans-serif`;
-            ctx.fillStyle = varColor('--gold'); ctx.globalAlpha = comboDisplayLife / 60; ctx.fillText(`${comboCount} STREAK!`, width/2, height/2 - 100); ctx.restore();
-        }
-
-        // 爆発 ＆ ⑧ 衝撃波フィニッシュ
-        explosions = explosions.filter(e => e.life > 0);
-        explosions.forEach(e => { 
-            if (e.isFinishWave) { e.r += 40; e.life -= 0.02; ctx.strokeStyle = `rgba(255,255,255,${e.life})`; ctx.lineWidth = 10; }
-            else { e.r += 12; e.life -= 0.04; ctx.strokeStyle = "#ff3e3e"; ctx.lineWidth = 4; }
-            ctx.globalAlpha = e.life; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke(); 
-        });
-
-        if (zoomEffect.active) {
-            zoomEffect.life--; zoomEffect.size += width * 0.038; zoomEffect.hue += 15;
-            ctx.save(); ctx.globalAlpha = Math.min(1, zoomEffect.life / 20); ctx.textAlign = "center"; ctx.font = `italic bold ${zoomEffect.size}px 'Courier New'`;
-            if (zoomEffect.isRainbow) { ctx.fillStyle = `hsl(${zoomEffect.hue % 360}, 100%, 70%)`; ctx.shadowBlur = 40; ctx.shadowColor = ctx.fillStyle; }
-            else { ctx.fillStyle = "#ffffff"; ctx.shadowBlur = 20; ctx.shadowColor = "#fff"; }
-            ctx.fillText(zoomEffect.text, width/2, height/2 + zoomEffect.size/3); ctx.restore();
-            if (zoomEffect.life <= 0) zoomEffect.active = false;
-        }
-
-        // ⑩ パーティクル磁力吸着
-        particles.forEach(p => { 
-            if (p.isMagnet && pointer.x !== -1000) {
-                let dx = pointer.x - p.x, dy = pointer.y - p.y;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < 300) { p.vx += dx/50; p.vy += dy/50; p.vx *= 0.95; p.vy *= 0.95; }
-            }
-            ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); p.x += p.vx * timeDilation; p.y += p.vy * timeDilation; p.life -= 0.02; 
-        });
-        particles = particles.filter(p => p.life > 0);
-        
-        // ⑦ グリッチノイズ
-        if (glitchActive > 0) {
-            glitchActive--;
-            ctx.save(); ctx.globalAlpha = 0.3;
-            ctx.drawImage(canvas, Math.random()*20-10, 0);
-            ctx.restore();
-        }
-
-        scorePopups.forEach(s => { const isMinus = s.val < 0; ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; ctx.globalAlpha = s.life; ctx.font = `bold ${isMinus ? 32 : 30}px 'Courier New'`; ctx.textAlign = "center"; ctx.fillText((s.val > 0 ? "+" : "") + s.val, s.x, s.y); s.y -= 1.2; s.life -= 0.02; });
-        scorePopups = scorePopups.filter(s => s.life > 0);
-
-        const ratio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN);
-        ctx.save(); ctx.translate(pointer.rawX, pointer.rawY);
-        const col = ratio === 1 ? "#00f2ff" : "#ff3e3e";
-        ctx.strokeStyle = ratio === 1 ? "#00f2ff" : "#444"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, 18, -Math.PI/2, (-Math.PI/2)+(Math.PI*2*ratio)); ctx.stroke();
-        ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(12,0); ctx.moveTo(0,-12); ctx.lineTo(0,12); ctx.stroke(); ctx.restore();
-
+        if (comboDisplayLife > 0 && comboCount > 1) { comboDisplayLife--; ctx.save(); ctx.textAlign = "center"; ctx.font = `bold ${40 + comboCount*2}px sans-serif`; ctx.fillStyle = varColor('--gold'); ctx.globalAlpha = comboDisplayLife / 60; ctx.fillText(`${comboCount} STREAK!`, width/2, height/2 - 100); ctx.restore(); }
+        explosions = explosions.filter(e => e.life > 0); explosions.forEach(e => { if (e.isFinishWave) { e.r += 40; e.life -= 0.02; ctx.strokeStyle = `rgba(255,255,255,${e.life})`; ctx.lineWidth = 10; } else { e.r += 12; e.life -= 0.04; ctx.strokeStyle = "#ff3e3e"; ctx.lineWidth = 4; } ctx.globalAlpha = e.life; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke(); });
+        if (zoomEffect.active) { zoomEffect.life--; zoomEffect.size += width * 0.038; zoomEffect.hue += 15; ctx.save(); ctx.globalAlpha = Math.min(1, zoomEffect.life / 20); ctx.textAlign = "center"; ctx.font = `italic bold ${zoomEffect.size}px 'Courier New'`; if (zoomEffect.isRainbow) { ctx.fillStyle = `hsl(${zoomEffect.hue % 360}, 100%, 70%)`; ctx.shadowBlur = 40; ctx.shadowColor = ctx.fillStyle; } else { ctx.fillStyle = "#ffffff"; ctx.shadowBlur = 20; ctx.shadowColor = "#fff"; } ctx.fillText(zoomEffect.text, width/2, height/2 + zoomEffect.size/3); ctx.restore(); if (zoomEffect.life <= 0) zoomEffect.active = false; }
+        particles.forEach(p => { if (p.isMagnet && pointer.x !== -1000) { let dx = pointer.x - p.x, dy = pointer.y - p.y, dist = Math.sqrt(dx*dx + dy*dy); if (dist < 300) { p.vx += dx/50; p.vy += dy/50; p.vx *= 0.95; p.vy *= 0.95; } } ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); p.x += p.vx * timeDilation; p.y += p.vy * timeDilation; p.life -= 0.02; }); particles = particles.filter(p => p.life > 0);
+        if (glitchActive > 0) { glitchActive--; ctx.save(); ctx.globalAlpha = 0.3; ctx.drawImage(canvas, Math.random()*20-10, 0); ctx.restore(); }
+        scorePopups.forEach(s => { const isMinus = s.val < 0; ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; ctx.globalAlpha = s.life; ctx.font = `bold ${isMinus ? 32 : 30}px 'Courier New'`; ctx.textAlign = "center"; ctx.fillText((s.val > 0 ? "+" : "") + s.val, s.x, s.y); s.y -= 1.2; s.life -= 0.02; }); scorePopups = scorePopups.filter(s => s.life > 0);
+        const ratio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN); ctx.save(); ctx.translate(pointer.rawX, pointer.rawY); const col = ratio === 1 ? "#00f2ff" : "#ff3e3e"; ctx.strokeStyle = ratio === 1 ? "#00f2ff" : "#444"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 18, -Math.PI/2, (-Math.PI/2)+(Math.PI*2*ratio)); ctx.stroke(); ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(12,0); ctx.moveTo(0,-12); ctx.lineTo(0,12); ctx.stroke(); ctx.restore();
         if (pointer.x !== -1000) { ctx.strokeStyle = "#00f2ff"; ctx.globalAlpha = 0.4; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke(); }
-        
-        ctx.filter = 'none'; // フィルタ解除
-        requestAnimationFrame(animate);
+        ctx.filter = 'none'; requestAnimationFrame(animate);
     }
 
     function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
