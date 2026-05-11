@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DVD Pro Striker: Transcendence Elite</title>
+    <title>DVD Pro Striker: Transcendence Elite v10.7</title>
     <style>
         :root {
             --neon: #00f2ff;
@@ -57,13 +57,13 @@
         .btn:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px var(--neon); }
 
         .settings {
-            margin: 20px 0; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; width: 240px;
+            margin: 15px 0; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; width: 260px;
         }
-        .settings label { font-size: 12px; color: var(--neon); display: block; margin-bottom: 5px; }
+        .settings label { font-size: 11px; color: var(--neon); display: block; margin-bottom: 5px; text-align: center; }
         input[type=range] { width: 100%; cursor: pointer; }
 
         .manual {
-            text-align: left; font-size: 11px; line-height: 1.5; max-width: 320px;
+            text-align: left; font-size: 11px; line-height: 1.6; max-width: 320px;
             background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;
             margin-bottom: 10px; border-left: 4px solid var(--neon);
         }
@@ -85,23 +85,25 @@
 <div id="flash"></div>
 
 <div id="start-screen" class="overlay">
-    <h1 style="font-size: 26px; color: var(--neon); letter-spacing: 4px;">DVD PRO STRIKER</h1>
+    <h1 style="font-size: 26px; color: var(--neon); letter-spacing: 4px; margin-bottom: 5px;">DVD PRO STRIKER</h1>
+    <p style="font-size: 10px; opacity: 0.5; margin-bottom: 15px;">v10.7 TRANSCENDENCE EDITION</p>
     
+    <div class="manual">
+        <strong style="color:var(--neon)">【遊び方・ルール】</strong><br>
+        ・<span style="color:var(--gold)">シールド:</span> 中央エリア内で指やマウスを動かしブロックを弾きます。<br>
+        ・<span style="color:var(--gold)">衝撃波:</span> 2本目指タップ（PCは左クリック）で周囲を吹き飛ばします。<br>
+        ・<span style="color:var(--gold)">角ヒット:</span> +10,000pt ＆ 全画面衝撃波。高得点の鍵です。<br>
+        ・<span style="color:var(--warn)">衝突注意:</span> ブロック同士が当たると減点 ＆ コンボが即リセット。<br>
+        ・<span style="color:var(--gold)">カオス:</span> 残り5秒でユニットが急増殖。BGMも加速します。
+    </div>
+
     <div class="settings">
         <label>BGM VOLUME</label>
         <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5" oninput="updateBGMVolume(this.value)">
     </div>
 
-    <div class="manual">
-        <strong style="color:var(--neon)">【TRANSCDENCE 2.0】</strong><br>
-        ・反射音を50%軽減。聴覚疲労を抑え没入感UP。<br>
-        ・ビジュアルスポットライト：スタイリッシュなライティング。<br>
-        ・爆発強化：一撃の衝撃を画面の歪みで表現。<br>
-        ・中央STREAK：コンボ状況をフィールド中央へ透過表示。
-    </div>
-
-    <button class="btn" onclick="initGame('PC')">PC TERMINAL</button>
-    <button class="btn" onclick="initGame('MOBILE')">MOBILE UNIT</button>
+    <button class="btn" onclick="initGame('PC')">PC版で開始</button>
+    <button class="btn" onclick="initGame('MOBILE')">モバイル版で開始</button>
 </div>
 
 <div id="result-screen" class="overlay" style="display:none;">
@@ -142,16 +144,10 @@
     let chaosFlash = 0, spotlightTarget = null, proximityZoomSize = 40;
     let warpOffset = 0, gridDistortion = 0;
     let heartRate = 0, glitchActive = 0;   
-    let blastShockwave = 0; // 爆発時の画面歪み用
-
-    let isSpacePressed = false, isShiftPressed = false;
-    const BLAST_COOLDOWN = 3000;
-    const pointer = { x: -1000, y: -1000, rawX: -1000, rawY: -1000, r: 75 };
-    let lastBlastTime = 0;
+    let blastShockwave = 0;
 
     function playSE(audioElem, volumeMult = 1.0) {
         audioElem.currentTime = 0;
-        // 反射音(seNomal)は指定通り50%(0.5)にする
         let baseVolume = (audioElem === seNomal) ? 0.5 : 1.0;
         audioElem.volume = baseVolume * volumeMult;
         audioElem.play().catch(e => {});
@@ -247,7 +243,7 @@
             const now = Date.now(); 
             if (now - lastBlastTime > BLAST_COOLDOWN) { 
                 lastBlastTime = now; playSE(seBaku);
-                blastShockwave = 20; // 画面歪みON
+                blastShockwave = 20; 
                 explosions.push({x, y, r: 0, life: 1.0}); 
                 if (platform === 'MOBILE') navigator.vibrate(50); 
             } 
@@ -269,13 +265,11 @@
         audio.volume = (slowMoTimer > 0) ? baseVol * 0.6 : baseVol;
         audio.playbackRate = (timeLeft <= 5 && timeLeft > 0) ? 1.25 : 1.0;
 
-        // グローバルフィルタ設定
         if (timeLeft <= 5 && timeLeft > 0) ctx.filter = 'grayscale(100%) brightness(1.2)';
         else ctx.filter = 'none';
 
         ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, width, height);
 
-        // 背景
         warpOffset += (timeLeft <= 5) ? 20 : 1; gridDistortion *= 0.92;
         ctx.save();
         if (blastShockwave > 0) {
@@ -288,13 +282,7 @@
         ctx.restore();
         
         ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.beginPath(); ctx.ellipse(width/2, height/2, width*0.35, height*0.35, 0, 0, Math.PI*2); ctx.stroke();
-        if (timeLeft <= 5 && Math.sin(Date.now()/50) > 0) { ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.lineWidth = 15; ctx.strokeRect(0, 0, width, height); }
         
-        if (timeLeft > 5) { 
-            for (let i=0; i<logos.length; i++) for (let j=i+1; j<logos.length; j++) { let a=logos[i], b=logos[j]; if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) { playSE(seCross); addScore(-100, a.x + a.w/2, a.y + a.h/2); comboCount = 0; comboDisplayLife = 0; let ang = Math.atan2(b.y - a.y, b.x - a.x); a.vx -= Math.cos(ang) * 3.5; a.vy -= Math.sin(ang) * 3.5; b.vx += Math.cos(ang) * 3.5; b.vy += Math.sin(ang) * 3.5; } } 
-        }
-
-        // --- 中央コンボ数表示 (スマホ版配慮) ---
         if (comboCount > 1) {
             ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
             ctx.font = `bold ${width*0.25}px sans-serif`;
@@ -305,9 +293,12 @@
             ctx.restore();
         }
 
+        if (timeLeft <= 5 && Math.sin(Date.now()/50) > 0) { ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.lineWidth = 15; ctx.strokeRect(0, 0, width, height); }
+        if (timeLeft > 5) { 
+            for (let i=0; i<logos.length; i++) for (let j=i+1; j<logos.length; j++) { let a=logos[i], b=logos[j]; if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) { playSE(seCross); addScore(-100, a.x + a.w/2, a.y + a.h/2); comboCount = 0; comboDisplayLife = 0; let ang = Math.atan2(b.y - a.y, b.x - a.x); a.vx -= Math.cos(ang) * 3.5; a.vy -= Math.sin(ang) * 3.5; b.vx += Math.cos(ang) * 3.5; b.vy += Math.sin(ang) * 3.5; } } 
+        }
         logos.forEach(l => { l.update(16); l.draw(); });
 
-        // ★スタイリッシュ・スポットライト (円線を消し、グロー効果に)
         if (curT && !zoomEffect.active) {
             ctx.save();
             const grad = ctx.createRadialGradient(curT.x, curT.y, 50, curT.x, curT.y, 300);
@@ -315,7 +306,6 @@
             grad.addColorStop(0.6, 'rgba(0,0,0,0.5)');
             grad.addColorStop(1, 'rgba(0,0,0,0.85)');
             ctx.fillStyle = grad; ctx.fillRect(0, 0, width, height);
-            
             heartRate += 0.2; let pulse = 1 + Math.sin(heartRate) * 0.1;
             ctx.save(); ctx.textAlign="center"; ctx.font=`bold ${40 * pulse}px sans-serif`;
             ctx.fillStyle=`rgba(255,255,255,${0.4 * pulse})`;
@@ -324,20 +314,14 @@
             ctx.restore();
         } else { heartRate = 0; }
 
-        // 爆発 ＆ 衝撃波 (派手めに調整)
         explosions = explosions.filter(e => e.life > 0);
         explosions.forEach(e => { 
             if (e.isFinishWave) {
-                e.r += 45; e.life -= 0.02;
-                ctx.strokeStyle = `rgba(255, 255, 255, ${e.life})`; ctx.lineWidth = 15 * e.life;
-                ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke();
+                e.r += 45; e.life -= 0.02; ctx.strokeStyle = `rgba(255, 255, 255, ${e.life})`; ctx.lineWidth = 15 * e.life; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke();
             } else {
                 e.r += 14; e.life -= 0.03;
-                // 二重の輪で派手さを演出
-                ctx.strokeStyle = `rgba(255, 62, 62, ${e.life})`; ctx.lineWidth = 6;
-                ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke();
-                ctx.strokeStyle = `rgba(0, 242, 255, ${e.life*0.5})`; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.arc(e.x, e.y, e.r*0.8, 0, Math.PI*2); ctx.stroke();
+                ctx.strokeStyle = `rgba(255, 62, 62, ${e.life})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke();
+                ctx.strokeStyle = `rgba(0, 242, 255, ${e.life*0.5})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y, e.r*0.8, 0, Math.PI*2); ctx.stroke();
             }
         });
 
@@ -362,7 +346,6 @@
         
         scorePopups.forEach(s => { const isMinus = s.val < 0; ctx.fillStyle = isMinus ? "#ff3e3e" : "#ffffff"; ctx.globalAlpha = s.life; ctx.font = `bold ${isMinus ? 32 : 30}px sans-serif`; ctx.textAlign = "center"; ctx.fillText((s.val > 0 ? "+" : "") + s.val.toLocaleString(), s.x, s.y); s.y -= 1.2; s.life -= 0.02; }); scorePopups = scorePopups.filter(s => s.life > 0);
         
-        // シールドUI
         const ratio = Math.min(1, (Date.now() - lastBlastTime) / BLAST_COOLDOWN); ctx.save(); ctx.translate(pointer.rawX, pointer.rawY); const col = ratio === 1 ? "#00f2ff" : "#ff3e3e"; ctx.strokeStyle = ratio === 1 ? "#00f2ff" : "#444"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 18, -Math.PI/2, (-Math.PI/2)+(Math.PI*2*ratio)); ctx.stroke(); ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(12,0); ctx.moveTo(0,-12); ctx.lineTo(0,12); ctx.stroke(); ctx.restore();
         if (pointer.x !== -1000) { ctx.strokeStyle = "#00f2ff"; ctx.globalAlpha = 0.4; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pointer.x, pointer.y, pointer.r, 0, Math.PI*2); ctx.stroke(); }
         
