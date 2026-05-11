@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DVD Pro Striker: Transcendence SE Max</title>
+    <title>DVD Pro Striker: Transcendence SE v10.6</title>
     <style>
         :root {
             --neon: #00f2ff;
@@ -108,7 +108,7 @@
 
 <div id="result-screen" class="overlay" style="display:none;">
     <h1 style="font-size: 20px; margin-bottom: 20px;">MISSION COMPLETE</h1>
-    <div id="ranking-content" style="width:280px; border:1px solid var(--text); background:rgba(255,255,255,0.08);"></div>
+    <div class="ranking-board" id="ranking-content" style="width:280px; border:1px solid var(--text); background:rgba(255,255,255,0.08);"></div>
     <button class="btn" onclick="location.reload()">RE-BOOT</button>
 </div>
 
@@ -151,8 +151,11 @@
     const pointer = { x: -1000, y: -1000, rawX: -1000, rawY: -1000, r: 75 };
     let lastBlastTime = 0;
 
-    function playSE(audioElem) {
+    // ★反射音の音量調整用 playSE
+    function playSE(audioElem, volumeMult = 1.0) {
         audioElem.currentTime = 0;
+        // nomal音（反射音）の場合のみ指定された70%の音量にする
+        audioElem.volume = (audioElem === seNomal) ? 0.7 * volumeMult : 1.0 * volumeMult;
         audioElem.play().catch(e => {});
     }
 
@@ -200,7 +203,7 @@
                 explosions.push({x: this.x + this.w/2, y: this.y + this.h/2, r: 0, life: 1.0, isFinishWave: true});
                 for(let i=0; i<30; i++) particles.push({x: this.x+this.w/2, y: this.y+this.h/2, vx:(Math.random()-0.5)*20, vy:(Math.random()-0.5)*20, life:1.0, color:varColor('--gold'), isMagnet: true});
             } else if (hitW || hitH) { 
-                playSE(seNomal);
+                playSE(seNomal); // ここで70%で再生されます
                 triggerCombo(false); addScore(100 * (1 + comboCount * 0.1), this.x + this.w/2, this.y + this.h/2); 
             }
             if (hitW || hitH) this.color = `hsl(${Math.random()*360}, 75%, 60%)`;
@@ -261,7 +264,6 @@
             const now = Date.now(); 
             if (now - lastBlastTime > BLAST_COOLDOWN) { 
                 lastBlastTime = now; 
-                // ★爆発SEの再生
                 playSE(seBaku);
                 explosions.push({x, y, r: 0, life: 1.0}); 
                 if (platform === 'MOBILE') navigator.vibrate(30); 
