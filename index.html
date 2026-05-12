@@ -3,22 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DVD Pro Striker: Transcendence Elite v12.6</title>
+    <title>DVD Pro Striker: Transcendence Elite v12.7 RE-FIXED</title>
     <style>
         :root {
             --neon: #00f2ff; --warn: #ff3e3e; --gold: #ffd700; --bg: #0a0a0a; --text: #ffffff;
         }
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
-            background: var(--bg); font-family: 'Arial Black', sans-serif; color: var(--text);
+            background: var(--bg); font-family: 'Courier New', Courier, monospace; color: var(--text);
             touch-action: none; user-select: none;
         }
         canvas { display: block; cursor: none; }
         
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; pointer-events: none; z-index: 20; }
-        .hud { display: flex; justify-content: center; margin-top: 10px; gap: 20px; background: rgba(0,0,0,0.7); padding: 5px; border-bottom: 2px solid var(--neon); }
-        #score-display { font-size: 24px; color: var(--neon); text-shadow: 0 0 10px var(--neon); }
-        #timer-display { font-size: 24px; font-weight: bold; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; pointer-events: none; z-index: 20; display: flex; justify-content: center; }
+        .hud-center {
+            margin-top: 10px; text-align: center; padding: 5px 20px; 
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+            border-radius: 10px; display: flex; gap: 20px; align-items: baseline;
+        }
+        #score-display { font-size: 24px; color: var(--neon); letter-spacing: 2px; font-weight: bold; text-shadow: 0 0 10px var(--neon); }
+        #best-display { font-size: 10px; opacity: 0.8; color: var(--gold); }
+        #timer-display { font-size: 28px; font-weight: bold; color: var(--text); min-width: 40px; }
 
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -26,72 +31,60 @@
             justify-content: center; align-items: center; z-index: 100; pointer-events: auto;
         }
         .manual {
-            text-align: left; font-size: 11px; line-height: 1.5; max-width: 320px;
-            background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;
-            margin: 15px 0; border-left: 4px solid var(--neon);
+            text-align: left; font-size: 11px; line-height: 1.6; max-width: 320px;
+            background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 4px solid var(--neon);
         }
         .btn {
-            background: #000; color: #fff; border: 2px solid #fff; padding: 12px 30px;
-            font-size: 16px; cursor: pointer; font-weight: bold;
-            box-shadow: 5px 5px 0px var(--neon); margin: 8px; width: 240px;
+            background: var(--bg); color: var(--text); border: 2px solid var(--text);
+            padding: 12px 30px; font-size: 16px; cursor: pointer; font-weight: bold;
+            box-shadow: 6px 6px 0px var(--neon); margin: 10px; width: 240px;
         }
         .btn:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px var(--neon); }
-        
-        #pato-lamp {
-            position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
-            width: 80px; height: 50px; background: #333; border-radius: 40px 40px 0 0;
-            border: 2px solid #000; z-index: 30; display: none;
-        }
-        #pato-light {
-            width: 100%; height: 100%; border-radius: 40px 40px 0 0;
-            background: radial-gradient(circle, #ff0000, transparent);
-        }
+
+        #pato-lamp { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 80px; height: 50px; background: #333; border-radius: 40px 40px 0 0; border: 2px solid #000; z-index: 30; display: none; }
+        #pato-light { width: 100%; height: 100%; border-radius: 40px 40px 0 0; background: radial-gradient(circle, #ff0000, transparent); }
         @keyframes spin { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
-
-        #gun-timer {
-            position: absolute; bottom: 80px; right: 20px; font-size: 18px;
-            color: var(--gold); text-shadow: 0 0 5px #000; display: none;
-        }
-
+        #gun-timer { position: absolute; bottom: 80px; right: 20px; font-size: 18px; color: var(--gold); text-shadow: 0 0 5px #000; display: none; }
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; background: white; z-index: 50; }
+        .shake-heavy { animation: shake 0.4s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-6px, 6px); } 75% { transform: translate(6px, -8px); } }
     </style>
 </head>
 <body>
 
-<audio id="bgm-player" src="bgm.mp3" loop></audio>
-<audio id="se-start" src="start.mp3"></audio>
-<audio id="se-corner" src="corner.mp3"></audio>
-<audio id="se-cross" src="cross.mp3"></audio>
-<audio id="se-nomal" src="nomal.mp3"></audio>
-<audio id="se-baku" src="baku.mp3"></audio>
+<audio id="bgm-player" src="bgm.mp3" loop preload="auto"></audio>
+<audio id="se-start" src="start.mp3" preload="auto"></audio>
+<audio id="se-corner" src="corner.mp3" preload="auto"></audio>
+<audio id="se-cross" src="cross.mp3" preload="auto"></audio>
+<audio id="se-nomal" src="nomal.mp3" preload="auto"></audio>
+<audio id="se-baku" src="baku.mp3" preload="auto"></audio>
 
 <div id="flash"></div>
 <div id="pato-lamp"><div id="pato-light"></div></div>
 <div id="gun-timer">群演出終了まで: <span id="gun-sec">1.0</span>s</div>
 
 <div id="start-screen" class="overlay">
-    <h1 style="color:var(--neon); letter-spacing:4px; margin-bottom: 0;">DVD PRO STRIKER</h1>
-    <p style="font-size: 10px; opacity: 0.5;">v12.6 COMBO & GOLD UPDATE</p>
-    
+    <h1 style="font-size: 26px; color: var(--neon); letter-spacing: 4px; margin-bottom: 5px;">DVD PRO STRIKER</h1>
+    <p style="font-size: 10px; opacity: 0.5; margin-bottom: 15px;">v12.7 RE-FIXED</p>
     <div class="manual">
-        <strong style="color:var(--neon)">【遊び方・ルール】</strong><br>
-        ・<span style="color:var(--gold)">反射:</span> 中央円内でポインターを動かし弾く。<br>
-        ・<span style="color:var(--gold)">コンボ:</span> 壁の辺・角に当たるたびにコンボ上昇！<br>
-        ・<span style="color:var(--gold)">黄金個体:</span> 20コンボ到達で出現！得点10倍！<br>
-        ・<span style="color:var(--gold)">群演出:</span> 13コンボ到達で1秒間ミニDVD群が爆裂！<br>
-        ・<span style="color:var(--warn)">三位一体:</span> 衝撃波で通常ロゴ3つ巻込。ミニDVDは合体不可。
+        <strong style="color:var(--neon)">【ルール】</strong><br>
+        ・<span style="color:var(--gold)">反射:</span> 中央円内で弾く。壁・角でコンボ。<br>
+        ・<span style="color:var(--gold)">爆風:</span> クリック/2本指タップで炸裂！<br>
+        ・<span style="color:var(--warn)">衝突:</span> ロゴ同士が当たると減点＆コンボ消滅。<br>
+        ・<span style="color:var(--gold)">CHANCE:</span> 角に近づくとスロー＆スポットライト演出。
     </div>
-
-    <div style="margin-bottom:15px; font-size: 12px;">BGM <input type="range" id="vol-range" min="0" max="1" step="0.1" value="0.5"></div>
-    
-    <button class="btn" onclick="initGame('PC')">PC TERMINAL</button>
-    <button class="btn" onclick="initGame('MOBILE')">MOBILE UNIT</button>
+    <div class="settings">
+        <label>BGM VOLUME</label>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5" oninput="updateBGMVolume(this.value)">
+    </div>
+    <button class="btn" onclick="initGame('PC')">PC版で開始</button>
+    <button class="btn" onclick="initGame('MOBILE')">モバイル版で開始</button>
 </div>
 
 <div id="ui-layer">
-    <div class="hud">
+    <div class="hud-center">
         <div id="best-display">BEST: 0</div>
-        <div id="score-display">000,000</div>
+        <div id="score-display">0</div>
         <div id="timer-display">60</div>
     </div>
 </div>
@@ -102,54 +95,52 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const flash = document.getElementById('flash');
-    const audio = {
-        bgm: document.getElementById('bgm-player'),
-        start: document.getElementById('se-start'),
-        corner: document.getElementById('se-corner'),
-        cross: document.getElementById('se-cross'),
-        nomal: document.getElementById('se-nomal'),
-        baku: document.getElementById('se-baku')
-    };
+    const audio = document.getElementById('bgm-player');
+    const seStart = document.getElementById('se-start');
+    const seCorner = document.getElementById('se-corner');
+    const seCross = document.getElementById('se-cross');
+    const seNomal = document.getElementById('se-nomal');
+    const seBaku = document.getElementById('se-baku');
 
     let w, h, score = 0, timeLeft = 60, gameActive = false, platform = 'PC';
-    let logos = [], particles = [], explosions = [], scorePopups = [];
-    let combo = 0, lastCornerTime = 0, comboLife = 0;
-    let timeDilation = 1.0, slowTimer = 0, spotlightPos = null;
-    let gridDistortion = 0, warpOffset = 0, blastShake = 0, glitchTime = 0;
+    let logos = [], particles = [], scorePopups = [], explosions = [];
+    let comboCount = 0, comboDisplayLife = 0, lastHitTime = 0;
+    let timeDilation = 1.0, slowMoTimer = 0, spotlightTarget = null;
+    let gridDistortion = 0, warpOffset = 0, blastShake = 0, heartRate = 0;
     let cornerHitCount = 0, gunTime = 0, pushCount = 0, pushTimer = 0;
     const pointer = { x: -1000, y: -1000, rawX: -1000, rawY: -1000, r: 75 };
-    let lastBlast = 0;
+    let lastBlastTime = 0;
+    const BLAST_COOLDOWN = 3000;
+    let zoomEffect = { active: false, text: "", life: 0, size: 0, hue: 0, isRainbow: true };
+
+    function playSE(se, vol = 1.0) { se.currentTime = 0; se.volume = vol; se.play().catch(()=>{}); }
+    function updateBGMVolume(val) { audio.volume = val; }
 
     function initGame(mode) {
         platform = mode;
         w = canvas.width = window.innerWidth;
         h = canvas.height = window.innerHeight;
         document.getElementById('start-screen').style.display = 'none';
-        score = 0; timeLeft = 60; combo = 0; logos = [new Logo()];
+        score = 0; timeLeft = 60; comboCount = 0; logos = [new Logo()];
         gameActive = true;
-        audio.bgm.volume = document.getElementById('vol-range').value;
-        audio.bgm.play().catch(()=>{});
-        audio.start.play().catch(()=>{});
+        audio.volume = document.getElementById('volume-slider').value;
+        audio.play().catch(()=>{});
+        playSE(seStart);
         updateScoreUI();
         requestAnimationFrame(animate);
         
         const timerInt = setInterval(() => {
             if(!gameActive) { clearInterval(timerInt); return; }
-            if(slowTimer <= 0) {
+            if(timeDilation > 0.4) {
                 timeLeft--;
                 document.getElementById('timer-display').innerText = timeLeft;
-                // 黄金個体出現条件を 20コンボに変更
-                if(timeLeft % 10 === 0) logos.push(new Logo(false, combo >= 20 && Math.random() < 0.4));
+                if(timeLeft % 10 === 0) logos.push(new Logo(false, comboCount >= 20 && Math.random() < 0.4));
             }
             if(timeLeft <= 0) {
                 if((String(score).split('7').length - 1) >= 2) {
-                    timeLeft = 10;
-                    audio.bgm.playbackRate = 0.5;
-                    setTimeout(()=> audio.bgm.playbackRate = 1.2, 1000);
+                    timeLeft = 10; triggerZoomEffect("復活!!", 0.7, true);
                 } else {
-                    gameActive = false; audio.bgm.pause();
-                    alert("RESULT: " + score.toLocaleString());
-                    location.reload();
+                    gameActive = false; audio.pause(); location.reload();
                 }
             }
         }, 1000);
@@ -157,93 +148,88 @@
 
     class Logo {
         constructor(isMini = false, isGold = false) {
-            this.isMini = isMini; 
-            this.isGold = isGold;
-            this.sizeMult = this.isMini ? 0.4 : (this.isGold ? 1.5 : 1.0);
-            this.w = w * 0.18 * this.sizeMult; this.h = this.w * 0.52;
+            this.isMini = isMini; this.isGold = isGold;
+            this.updateSize();
             this.x = Math.random() * (w - this.w); this.y = Math.random() * (h - this.h);
-            this.vx = (Math.random() > 0.5 ? 5 : -5) * (this.isMini ? 2 : 1); 
+            this.vx = (Math.random() > 0.5 ? 5 : -5) * (this.isMini ? 2 : 1);
             this.vy = (Math.random() > 0.5 ? 5 : -5) * (this.isMini ? 2 : 1);
-            this.color = this.isGold ? "#ffd700" : `hsl(${Math.random()*360}, 70%, 60%)`;
+            this.color = this.isGold ? "#ffd700" : `hsl(${Math.random()*360}, 75%, 60%)`;
             this.history = []; this.isMerged = false;
+        }
+        updateSize() {
+            let mult = this.isMini ? 0.4 : (this.isGold ? 1.5 : 1.0);
+            this.w = w * 0.18 * mult; this.h = this.w * 0.52;
         }
         update() {
             let spd = (timeLeft <= 5) ? 2.2 : 1.0;
-            if(platform === 'MOBILE' && isTouching) spd *= 1.5;
             this.x += this.vx * spd * timeDilation;
             this.y += this.vy * spd * timeDilation;
             this.history.unshift({x: this.x, y: this.y});
-            if(this.history.length > 10) this.history.pop();
+            if(this.history.length > 8) this.history.pop();
             
-            let hit = false;
-            let hitW = false, hitH = false;
-            if(this.x <= 0 || this.x + this.w >= w) { this.vx *= -1; this.x = this.x <= 0 ? 0 : w-this.w; hit = true; hitW = true;}
-            if(this.y <= 0 || this.y + this.h >= h) { this.vy *= -1; this.y = this.y <= 0 ? 0 : h-this.h; hit = true; hitH = true;}
+            // 爆風による物理反射 (復元)
+            explosions.forEach(exp => {
+                let dx = (this.x + this.w/2) - exp.x, dy = (this.y + this.h/2) - exp.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < exp.r + 65) {
+                    let angle = Math.atan2(dy, dx);
+                    let power = exp.isFinishWave ? 20 : 16;
+                    this.vx = Math.cos(angle) * power; this.vy = Math.sin(angle) * power;
+                }
+            });
+
+            let hit = false, hitW = false, hitH = false;
+            if(this.x <= 0 || this.x + this.w >= w) { this.vx *= -1; this.x = this.x <= 0 ? 0 : w-this.w; hit = true; hitW = true; }
+            if(this.y <= 0 || this.y + this.h >= h) { this.vy *= -1; this.y = this.y <= 0 ? 0 : h-this.h; hit = true; hitH = true; }
             
             if(hit) {
-                // コンボ加算条件: 壁の辺、または角に当たった時
                 if (gunTime <= 0) {
-                    combo++; comboLife = 90;
-                    if (combo === 13 && gunTime <= 0) {
-                        gunTime = 60; document.getElementById('gun-timer').style.display = 'block';
-                        for(let i=0; i<25; i++) logos.push(new Logo(true));
-                    }
+                    comboCount++; comboDisplayLife = 90;
+                    if (comboCount === 13) startGunMode();
                 }
-
-                audio.nomal.currentTime = 0; audio.nomal.volume = 0.5;
-                audio.nomal.playbackRate = 1.0 + (Math.min(combo, 40) * 0.025);
-                audio.nomal.play().catch(()=>{});
-
+                playSE(seNomal, 0.5);
                 const m = 55;
                 if((this.x < m || this.x + this.w > w - m) && (this.y < m || this.y + this.h > h - m)) {
-                    // 角ヒット
                     if(hitW && hitH) this.processCorner();
                 }
             } else {
-                // チャンスモード（スロー）判定
+                // スポットライト判定 (復元)
                 const m = 55;
                 if((this.x < m || this.x + this.w > w - m) && (this.y < m || this.y + this.h > h - m)) {
-                    if(slowTimer <= 0) { 
-                        slowTimer = 25; timeDilation = 0.1; spotlightPos = {x:this.x+this.w/2, y:this.y+this.h/2}; 
-                    }
+                    if(timeDilation > 0.1) { timeDilation = 0.1; slowMoTimer = 15; spotlightTarget = {x:this.x+this.w/2, y:this.y+this.h/2}; }
                 }
             }
 
+            // ポインター反射
             let dx = (this.x + this.w/2) - pointer.x, dy = (this.y + this.h/2) - pointer.y;
             if(Math.hypot(dx, dy) < pointer.r + this.h/2) {
-                let ang = Math.atan2(dy, dx);
-                this.vx = Math.cos(ang) * 8; this.vy = Math.sin(ang) * 8;
+                let ang = Math.atan2(dy, dx); this.vx = Math.cos(ang) * 8.5; this.vy = Math.sin(ang) * 8.5;
             }
         }
         processCorner() {
             cornerHitCount++;
-            if(cornerHitCount % 3 === 0) {
-                timeDilation = 0; setTimeout(()=> timeDilation = 1.0, 300);
-            }
-            const curV = audio.bgm.volume; audio.bgm.volume = curV * 0.1;
-            audio.corner.currentTime = 0; audio.corner.play().catch(()=>{});
-            setTimeout(()=> audio.bgm.volume = curV, 2000);
+            if(cornerHitCount % 3 === 0) { timeDilation = 0; setTimeout(()=> timeDilation = 1.0, 300); }
+            const curV = audio.volume; audio.volume = curV * 0.1;
+            playSE(seCorner); setTimeout(()=> audio.volume = curV, 2000);
             const lamp = document.getElementById('pato-lamp'); lamp.style.display = 'block';
             document.getElementById('pato-light').style.animation = 'spin 0.1s infinite';
             setTimeout(()=> { lamp.style.display = 'none'; }, 2000);
             
-            // ミニDVDのポイントは 80に変更
             let pts = this.isMini ? 80 : (this.isGold ? 100000 : 10000);
             if(this.isMerged) pts *= 5;
-            addScore(pts * (1 + combo * 0.05), this.x, this.y);
-
-            explosions.push({x:this.x+this.w/2, y:this.y+this.h/2, r:0, life:1.0, isFinish:true});
-            blastShake = 30; gridDistortion = 50;
+            addScore(pts * (1 + comboCount * 0.05), this.x + this.w/2, this.y + this.h/2);
+            explosions.push({x:this.x+this.w/2, y:this.y+this.h/2, r:0, life:1.0, isFinishWave:true});
+            blastShake = 30; gridDistortion = 50; triggerZoomEffect("CORNER!!", 0.5, true);
         }
         draw() {
             ctx.save();
             this.history.forEach((pos, i) => {
                 ctx.globalAlpha = (1 - i/10) * 0.3;
-                ctx.fillStyle = (combo > 20 || timeLeft <= 5) ? `hsl(${(Date.now()/5 + i*20)%360}, 100%, 50%)` : this.color;
+                ctx.fillStyle = (comboCount > 20 || timeLeft <= 5) ? `hsl(${(Date.now()/5 + i*20)%360}, 100%, 50%)` : this.color;
                 ctx.fillRect(pos.x, pos.y, this.w, this.h);
             });
             ctx.globalAlpha = 1;
-            ctx.fillStyle = "#000"; ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.fillStyle = "#0a0a0a"; ctx.fillRect(this.x, this.y, this.w, this.h);
             ctx.strokeStyle = this.color; ctx.lineWidth = this.isGold ? 4 : 2;
             ctx.strokeRect(this.x, this.y, this.w, this.h);
             ctx.fillStyle = this.color; ctx.font = `bold ${this.w*0.3}px sans-serif`;
@@ -252,134 +238,143 @@
         }
     }
 
+    function startGunMode() {
+        gunTime = 60; document.getElementById('gun-timer').style.display = 'block';
+        for(let i=0; i<25; i++) logos.push(new Logo(true));
+    }
+
     function addScore(pts, x, y) {
-        score += Math.floor(pts);
+        if(!gameActive) return; score += Math.floor(pts);
+        scorePopups.push({x, y, val: Math.floor(pts), life: 1.0}); // ポップアップ追加
         updateScoreUI();
-        scorePopups.push({x, y, val: Math.floor(pts), life: 1.0, isGold: pts > 45000});
     }
 
     function updateScoreUI() {
-        document.getElementById('score-display').innerText = score.toLocaleString().padStart(7, '0');
-        blastShake = 8;
+        const best = parseInt(localStorage.getItem('dvdBest_0') || 0);
+        document.getElementById('score-display').innerText = score.toLocaleString();
+        document.getElementById('best-display').innerText = "BEST: " + best.toLocaleString();
+    }
+
+    function triggerZoomEffect(text, dur, rain) {
+        const f = dur * 60; timeDilation = 0.05; slowMoTimer = f;
+        zoomEffect = {active:true, text, life:f, size:rain?20:w*0.05, hue:0, isRainbow:rain};
+        if(rain) { flash.style.opacity='0.5'; setTimeout(()=>flash.style.opacity='0',200); document.body.classList.add('shake-heavy'); setTimeout(()=>document.body.classList.remove('shake-heavy'),400); }
     }
 
     function animate() {
         if(!gameActive) return;
-        const curT = spotlightPos; spotlightPos = null;
-        ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0,0,w,h);
-        if(combo >= 40) { // 壁判定でのコンボ増加に伴い閾値調整
-            let p = Math.sin(Date.now()/100)*15;
-            ctx.shadowBlur = 40 + p; ctx.shadowColor = "#f00";
-            ctx.strokeStyle = `rgba(255,0,0,${0.2 + p/100})`;
-        } else ctx.strokeStyle = "rgba(0, 242, 255, 0.1)";
-        warpOffset += 2;
+        const curT = spotlightTarget; spotlightTarget = null;
+        if(slowMoTimer > 0) { slowMoTimer--; timeDilation += (1.0 - timeDilation) * 0.12; } else timeDilation = 1.0;
+        
+        ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, w, h);
+
+        // 背景
+        warpOffset += (timeLeft <= 5) ? 20 : 1; gridDistortion *= 0.92;
         ctx.save();
         if(blastShake > 0) { ctx.translate(Math.random()*blastShake-blastShake/2, Math.random()*blastShake-blastShake/2); blastShake *= 0.9; }
-        for(let i=-100; i<w+100; i+=50) {
-            ctx.beginPath();
-            for(let j=0; j<h; j+=25) ctx.lineTo(i + Math.sin((j+warpOffset)/50)*gridDistortion, j);
-            ctx.stroke();
-        }
-        ctx.restore(); gridDistortion *= 0.95;
+        ctx.strokeStyle = (timeLeft <= 5) ? "rgba(255,255,255,0.3)" : "rgba(0, 242, 255, 0.12)";
+        for(let x=-100; x<w+100; x+=50) { ctx.beginPath(); for(let y=0; y<h; y+=20) ctx.lineTo(x+Math.sin((y+warpOffset)/50)*gridDistortion, y); ctx.stroke(); }
+        for(let y=-100; y<h+100; y+=50) { ctx.beginPath(); for(let x=0; x<w; x+=20) ctx.lineTo(x, y+Math.cos((x+warpOffset)/50)*gridDistortion); ctx.stroke(); }
+        ctx.restore();
         
-        ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.ellipse(w/2, h/2, w*0.35, h*0.35, 0, 0, Math.PI*2); ctx.stroke();
-
-        if(comboLife > 0 && combo > 1) {
-            comboLife--;
+        // 巨大STREAK
+        if(comboDisplayLife > 0 && comboCount > 1) {
             ctx.save(); ctx.textAlign="center"; ctx.textBaseline="middle";
-            let sz = w * 0.3 + Math.sin(comboLife/5)*15;
-            ctx.font = `italic bold ${sz}px sans-serif`;
-            ctx.fillStyle = `rgba(0, 242, 255, ${Math.min(0.15, comboLife/100)})`;
-            ctx.fillText(combo, w/2, h/2);
-            ctx.restore();
+            ctx.font = `bold ${Math.floor(w*0.2)}px sans-serif`;
+            ctx.fillStyle = `rgba(0, 242, 255, ${Math.min(0.12, comboDisplayLife/100)})`;
+            ctx.fillText(comboCount, w/2, h/2);
+            ctx.restore(); comboDisplayLife--;
         }
-        let near = logos.filter(l => curT && Math.hypot(l.x+l.w/2-curT.x, l.y+l.h/2-curT.y) < 200);
-        if(near.length >= 2 && pushTimer <= 0) { pushTimer = 120; pushCount = 0; }
-        if(pushTimer > 0) {
-            pushTimer--; ctx.fillStyle = "var(--warn)"; ctx.font = "bold 50px sans-serif"; ctx.textAlign="center";
-            ctx.fillText("連打 PUSH!!", w/2, h/2 - 120);
-            if(pushCount >= 10) { near[0].processCorner(); pushCount = 0; pushTimer = 0; }
+
+        // 衝突判定 (復元)
+        if(timeLeft > 5) {
+            for(let i=0; i<logos.length; i++) for(let j=i+1; j<logos.length; j++) {
+                let a=logos[i], b=logos[j];
+                if(a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y) {
+                    playSE(seCross); addScore(-100, a.x+a.w/2, a.y+a.h/2);
+                    comboCount = 0; comboDisplayLife = 0;
+                    let ang = Math.atan2(b.y-a.y, b.x-a.x);
+                    a.vx -= Math.cos(ang)*3.5; a.vy -= Math.sin(ang)*3.5;
+                    b.vx += Math.cos(ang)*3.5; b.vy += Math.sin(ang)*3.5;
+                }
+            }
         }
-        if(curT) {
-            ctx.save(); ctx.translate(curT.x, curT.y); ctx.rotate(Date.now()/150);
-            ctx.strokeStyle = "var(--gold)"; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.arc(0,0, 65, 0, Math.PI*2); ctx.stroke();
-            for(let i=0; i<4; i++) { ctx.rotate(Math.PI/2); ctx.moveTo(45,0); ctx.lineTo(85,0); } ctx.stroke();
-            ctx.restore();
-        }
+
         logos.forEach(l => { l.update(); l.draw(); });
+
+        // スポットライト (復元)
+        if(curT && !zoomEffect.active) {
+            ctx.save(); const grad = ctx.createRadialGradient(curT.x, curT.y, 50, curT.x, curT.y, 300);
+            grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.8)'); ctx.fillStyle = grad; ctx.fillRect(0,0,w,h);
+            heartRate += 0.2; let pulse = 1 + Math.sin(heartRate)*0.1; ctx.textAlign="center"; ctx.font=`bold ${Math.floor(40*pulse)}px sans-serif`; ctx.fillStyle=`rgba(255,255,255,${0.4*pulse})`; ctx.fillText("CHANCE!", w/2, h/2+100); ctx.restore();
+        }
+
+        // 爆風
         explosions = explosions.filter(e => e.life > 0);
         explosions.forEach(e => {
-            e.r += 14; e.life -= 0.025;
-            ctx.strokeStyle = e.isFinish ? "#fff" : "var(--warn)"; ctx.lineWidth = 8 * e.life;
+            if(e.isFinishWave) { e.r += 45; e.life -= 0.02; ctx.strokeStyle=`rgba(255,255,255,${e.life})`; ctx.lineWidth=15*e.life; }
+            else { e.r += 14; e.life -= 0.03; ctx.strokeStyle=`rgba(255,62,62,${e.life})`; ctx.lineWidth=6; }
             ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke();
-            if(!e.isFinish) {
-                // 三位一体条件: ミニDVD（isMini）は除外
-                let targets = logos.filter(l => !l.isMini && Math.hypot(l.x+l.w/2-e.x, l.y+l.h/2-e.y) < e.r + 50);
-                if(targets.length >= 3) targets.forEach(l => { l.isMerged = true; l.vx = (l.x < w/2 ? -1 : 1)*15; l.vy = (l.y < h/2 ? -1 : 1)*15; });
+            // 三位一体
+            if(!e.isFinishWave) {
+                let targets = logos.filter(l => !l.isMini && Math.hypot(l.x+l.w/2-e.x, l.y+l.h/2-e.y) < e.r+50);
+                if(targets.length >= 3) targets.forEach(l => { l.isMerged=true; l.vx=(l.x<w/2?-1:1)*15; l.vy=(l.y<h/2?-1:1)*15; });
             }
         });
+
+        // スコアポップアップ (復元)
         scorePopups.forEach(s => {
             s.life -= 0.02; s.y -= 1.5;
-            ctx.fillStyle = s.isGold ? "var(--gold)" : "#fff";
-            ctx.font = s.isGold ? "bold 35px sans-serif" : "bold 22px sans-serif";
-            ctx.fillText("+"+s.val, s.x, s.y);
+            ctx.fillStyle = s.val < 0 ? "#ff3e3e" : (s.val > 45000 ? "#ffd700" : "#ffffff");
+            ctx.globalAlpha = s.life; ctx.font = `bold 24px sans-serif`; ctx.textAlign="center";
+            ctx.fillText((s.val > 0 ? "+" : "") + s.val.toLocaleString(), s.x, s.y);
         }); scorePopups = scorePopups.filter(s => s.life > 0);
+
+        if(gunTime > 0) { gunTime--; document.getElementById('gun-sec').innerText=(gunTime/60).toFixed(1); if(gunTime<=0){ document.getElementById('gun-timer').style.display='none'; logos=logos.filter(l=>!l.isMini); } }
         
-        if(gunTime > 0) {
-            gunTime--; document.getElementById('gun-sec').innerText = (gunTime/60).toFixed(1);
-            if(gunTime <= 0) {
-                document.getElementById('gun-timer').style.display = 'none';
-                logos = logos.filter(l => !l.isMini);
-            }
-        }
-        if(slowTimer > 0) slowTimer--; else { timeDilation = 1.0; }
+        // ポインター描画
         const cd = (timeLeft <= 5) ? 1000 : 3000;
-        const r = Math.min(1, (Date.now() - lastBlast) / cd);
-        ctx.save();
-        ctx.translate(pointer.x, pointer.y);
-        ctx.strokeStyle = r === 1 ? "var(--neon)" : "#555"; ctx.lineWidth = 4;
+        const r = Math.min(1, (Date.now() - lastBlastTime) / cd);
+        ctx.save(); ctx.translate(pointer.x, pointer.y); ctx.strokeStyle = r === 1 ? "#00f2ff" : "#555"; ctx.lineWidth = 4;
         ctx.beginPath(); ctx.arc(0, 0, pointer.r, 0, Math.PI*2); ctx.stroke();
-        if(r < 1) {
-            ctx.strokeStyle = "var(--warn)";
-            ctx.beginPath(); ctx.arc(0, 0, pointer.r, -Math.PI/2, -Math.PI/2 + Math.PI*2*r); ctx.stroke();
-        }
+        if(r < 1) { ctx.strokeStyle = "#ff3e3e"; ctx.beginPath(); ctx.arc(0,0,pointer.r, -Math.PI/2, -Math.PI/2+Math.PI*2*r); ctx.stroke(); }
         ctx.restore();
+
+        if (zoomEffect.active) {
+            zoomEffect.life--; zoomEffect.size += w*0.038; zoomEffect.hue += 15;
+            ctx.save(); ctx.globalAlpha = Math.min(1, zoomEffect.life/20); ctx.textAlign="center";
+            ctx.font = `italic bold ${Math.floor(zoomEffect.size)}px sans-serif`;
+            ctx.fillStyle = zoomEffect.isRainbow ? `hsl(${zoomEffect.hue%360},100%,70%)` : "#fff";
+            ctx.fillText(zoomEffect.text, w/2, h/2); ctx.restore();
+            if(zoomEffect.life <= 0) zoomEffect.active = false;
+        }
+
         requestAnimationFrame(animate);
     }
 
-    let isTouching = false;
     function updatePointer(ix, iy) {
         pointer.rawX = ix; pointer.rawY = iy;
         const cx = w/2, cy = h/2, rx = w*0.35, ry = h*0.35;
         const dx = ix - cx, dy = iy - cy;
         const distRatio = (dx/rx)**2 + (dy/ry)**2;
         if(distRatio <= 1) { pointer.x = ix; pointer.y = iy; }
-        else {
-            const scale = Math.sqrt(1 / distRatio);
-            pointer.x = cx + dx * scale; pointer.y = cy + dy * scale;
-        }
+        else { const scale = Math.sqrt(1 / distRatio); pointer.x = cx + dx * scale; pointer.y = cy + dy * scale; }
     }
     window.addEventListener('mousemove', e => { if(gameActive && platform === 'PC') updatePointer(e.clientX, e.clientY); });
-    window.addEventListener('mousedown', () => { if(gameActive && platform === 'PC') { if(pushTimer > 0) pushCount++; triggerBlast(); } });
-    window.addEventListener('touchstart', e => {
-        if(!gameActive) return;
-        isTouching = true; e.preventDefault();
-        updatePointer(e.touches[0].clientX, e.touches[0].clientY);
-        if(pushTimer > 0) pushCount++;
-        if(e.touches.length > 1) triggerBlast();
-    }, {passive: false});
+    window.addEventListener('mousedown', e => { if(gameActive && platform === 'PC') { triggerBlast(e.clientX, e.clientY); } });
+    window.addEventListener('touchstart', e => { if(gameActive) { e.preventDefault(); updatePointer(e.touches[0].clientX, e.touches[0].clientY); if(e.touches.length > 1) triggerBlast(e.touches[1].clientX, e.touches[1].clientY, true); } }, {passive: false});
     window.addEventListener('touchmove', e => { if(gameActive) updatePointer(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
-    window.addEventListener('touchend', () => { isTouching = false; });
-    function triggerBlast() {
+    window.addEventListener('touchend', () => {});
+
+    function triggerBlast(ix, iy, force = false) {
         const cd = (timeLeft <= 5) ? 1000 : 3000;
-        if(Date.now() - lastBlast > cd) {
-            lastBlast = Date.now();
-            audio.baku.currentTime = 0; audio.baku.play().catch(()=>{});
-            explosions.push({x:pointer.x, y:pointer.y, r:0, life:1.0});
+        if(Date.now() - lastBlastTime > cd) {
+            lastBlastTime = Date.now(); playSE(seBaku);
+            explosions.push({x:pointer.x, y:pointer.y, r:0, life:1.0}); // ポインター位置で爆発
         }
     }
+
+    window.addEventListener('resize', () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; logos.forEach(l => l.updateSize()); });
 </script>
 </body>
 </html>
